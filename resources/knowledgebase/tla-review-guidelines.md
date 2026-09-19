@@ -48,6 +48,26 @@ This document uses a **producer-consumer** (bounded buffer) specification as a r
   - The use of `RandomElement` is almost always wrong. Use non-determinism (`\E` or disjunction) instead. See `tla-RandomElement.md` for details.
   - Use of `TLC!Assert` is discouraged in plain TLA+ specs. `Assert` is primarily used in PlusCal specs. An invariant is a better alternative, and TLC will report a counterexample if the invariant is violated.
 
+### System and auxiliary declarations
+
+Declare system parameters and state separately from auxiliary modeling constants and variables:
+
+```tla
+\* System parameters and state.
+CONSTANTS Producers, Consumers, Capacity
+VARIABLES buffer, pc
+
+\* Auxiliary modeling declarations.
+CONSTANT SpuriousWakeups  \* Model switch, not implementation configuration.
+VARIABLE enqueueCount    \* History variable counting enqueues.
+```
+
+Classify by semantic role: `pc` represents system control state even without a corresponding implementation field.
+
+* Document each auxiliary declaration's effect on behaviors: history variables must not restrict them; model switches or bounds may. Identify settings matching the implementation.
+* Declare constants and variables used solely by the model-checking workload in the model-checking module, not in the system specification.
+* Apply the usual assumptions and `TypeOK` checks to both categories. Grouping changes neither scope nor semantics.
+
 ### Constants and Assumptions
 
 * If the spec declares constants, state assumptions that constrain their values. Ensure all constants have appropriate assumptions - for example, if declaring constants `NumProducers` and `NumConsumers`, use `ASSUME NumProducers \in Nat \ {0}` and `ASSUME NumConsumers \in Nat \ {0}` rather than only constraining one. Assumptions should be comprehensive and prevent nonsensical constant combinations (e.g., ensuring `BufferSize > 0`). TLC will refuse to check the spec if assumptions are violated, and assumptions aid readers in understanding the spec and are crucial for proving properties with TLAPS. Note: assumptions can be combined into a single ASSUME statement using conjunction, but TLC will not report which conjunct is violated, only that the assumption is violated. Assumptions may be named, e.g., `ASSUME ProducerAssumption == NumProducers \in Nat \ {0}`. It is good practice to name assumptions so they can be referred to in proofs.
