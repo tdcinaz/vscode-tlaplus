@@ -822,7 +822,7 @@
         "lint": "eslint --ext .ts,.tsx src/ tests/",
         "lint:fix": "eslint --fix --ext .ts,.tsx src/ tests/",
         "watch": "npm run compile -- --watch",
-        "pretest": "tsc -p ./ && node -e \"require('fs').cpSync('tools', 'out/tools', {recursive: true})\"",
+        "pretest": "tsc -p ./ && node -e \"const fs=require('fs'); fs.mkdirSync('out/tools',{recursive:true}); for (const f of fs.readdirSync('tools')) fs.copyFileSync('tools/'+f, 'out/tools/'+f);\"",
         "test": "node ./out/tests/runTest.js",
         "test:tlaplus-grammar": "vscode-tmgrammar-test ./tests/suite/languages/*.tla -g ./languages/tlaplus-grammar.json -g ./languages/pluscal-grammar.json",
         "prepare:playwright": "playwright install --with-deps chromium",
