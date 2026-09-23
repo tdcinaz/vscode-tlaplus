@@ -827,7 +827,14 @@
         "test:tlaplus-grammar": "vscode-tmgrammar-test ./tests/suite/languages/*.tla -g ./languages/tlaplus-grammar.json -g ./languages/pluscal-grammar.json",
         "prepare:playwright": "playwright install --with-deps chromium",
         "pretest:playwright": "npm run compile && npm run pretest && node scripts/playwright-generate-check-result.js",
-        "test:playwright": "playwright test"
+        "test:playwright": "playwright test",
+        "tlatex:doctor": "bash scripts/tlatex-dev.sh doctor",
+        "tlatex:setup": "bash scripts/tlatex-dev.sh setup",
+        "tlatex:build": "bash scripts/tlatex-dev.sh build",
+        "tlatex:test": "bash scripts/tlatex-dev.sh test",
+        "tlatex:install": "bash scripts/tlatex-dev.sh install",
+        "tlatex:dev": "bash scripts/tlatex-dev.sh dev",
+        "tlatex:restore": "bash scripts/tlatex-dev.sh restore"
     },
     "devDependencies": {
         "@playwright/test": "^1.56.1",

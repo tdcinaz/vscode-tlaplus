@@ -6,6 +6,7 @@
         }
     },
     "build": { "dockerfile": "Dockerfile" },
+    "postCreateCommand": "npm install",
     "mounts": [
         // add folder with test tla+ files, e.g. {"source": "path/to/folder", "target": "/workspaces/folder", "type": "bind"}
     ]

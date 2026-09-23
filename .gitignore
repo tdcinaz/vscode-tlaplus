@@ -6,3 +6,7 @@ version
 *.vsix
 
 test-results/
+
+# Local checkout of the tla2tools (TLATeX) Java source, managed by
+# scripts/tlatex-dev.sh. Coordinates are pinned in .tlatools.env instead.
+.tlatools/
