@@ -82,6 +82,18 @@ target above is already wired, so tests run as soon as you add them. Tests are
 compiled with `ant … compile compile-test` and executed via the `test-set`
 Ant target — the same mechanism the upstream `tlc2`/`tla2sany` suites use.
 
+## Sample specs for operator parsing
+
+Ready-made specs for the operator-to-TeX-macro work live in
+[tests/fixtures/tlatex/](../tests/fixtures/tlatex/): Greek-letter substitution,
+operator-application argument capture, nested/multi-line argument boundaries,
+and the full range of operator fixities. All parse cleanly with SANY. Typeset
+one with:
+
+```sh
+bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
+```
+
 ## How it stays reproducible
 
 - The toolchain (JDK, Ant, LaTeX) is baked into the Dev Container image.
