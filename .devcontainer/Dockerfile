@@ -11,6 +11,10 @@ RUN apt update \
     # tla2tools.jar from source (TLATeX overhaul): JDK 17 (matches upstream
     # tlaplus CI) + Ant with the optional tasks (junit) customBuild.xml needs.
     && apt install -y openjdk-17-jdk ant ant-optional \
+    # For inspecting TLATeX output: poppler renders PDF pages to PNG
+    # (scripts/tlatex-dev.sh render / pdfdiff; ImageMagick's `compare` ships
+    # with the base image) and extracts text. shellcheck lints the dev script.
+    && apt install -y poppler-utils shellcheck \
     && rm -rf /var/lib/apt/lists/*
 
 # Add minimal latex installation for tlaplus tools

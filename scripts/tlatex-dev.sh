@@ -21,6 +21,8 @@
 #   scripts/tlatex-dev.sh install             Copy built jar into ./tools (+ ./out/tools)
 #   scripts/tlatex-dev.sh dev                 build + install (fast inner loop)
 #   scripts/tlatex-dev.sh typeset <File.tla>...  Typeset spec(s) with the built jar; fails on LaTeX errors
+#   scripts/tlatex-dev.sh render <File.pdf|.tla> [page|all] [dpi]  Render PDF page(s) to PNG for inspection
+#   scripts/tlatex-dev.sh pdfdiff <a.pdf> <b.pdf>  Pixel-compare two PDFs page by page; writes highlight images
 #   scripts/tlatex-dev.sh golden              Regenerate the JUnit golden .tex files (review the diff!)
 #   scripts/tlatex-dev.sh regress [N]         Release jar vs built jar: .tex must be identical for tests/tlatex-regress.txt
 #   scripts/tlatex-dev.sh check               build + test + typeset fixtures + regress (what CI runs; TLATEX_SKIP_REGRESS=1 skips regress)
@@ -316,6 +318,68 @@ cmd_check() {
     log "check passed: build, tests, ${#fixtures[@]} fixture(s) typeset, regression."
 }
 
+# Render PDF page(s) to PNG so the typeset result can be looked at, by a human
+# or by an agent that can view images. Accepts the .tla (uses the .pdf beside
+# it) or the .pdf. Writes <root>-p<N>.png next to the PDF (gitignored for the
+# fixtures). `page` may be a number or "all"; dpi defaults to 110.
+cmd_render() {
+    [[ $# -ge 1 ]] || die "Usage: scripts/tlatex-dev.sh render <File.pdf|File.tla> [page|all] [dpi]"
+    require pdftoppm
+    require pdfinfo
+    local src="$1" page="${2:-1}" dpi="${3:-110}"
+    [[ "${src}" == *.tla ]] && src="${src%.tla}.pdf"
+    [[ -f "${src}" ]] || die "PDF not found: ${src} (typeset the spec first)"
+    local root="${src%.pdf}" pages
+    pages="$(pdfinfo "${src}" | awk '/^Pages:/{print $2}')"
+    if [[ "${page}" == "all" ]]; then
+        pdftoppm -r "${dpi}" -png "${src}" "${root}-p"
+        log "Rendered ${pages} page(s) of ${src} -> ${root}-p-<N>.png"
+    else
+        [[ "${page}" -ge 1 && "${page}" -le "${pages}" ]] || die "Page ${page} out of range (1..${pages})"
+        pdftoppm -r "${dpi}" -f "${page}" -l "${page}" -png -singlefile "${src}" "${root}-p${page}"
+        log "Rendered page ${page}/${pages} of ${src} -> ${root}-p${page}.png"
+    fi
+}
+
+# Visual regression between two PDFs (for example the same spec typeset with
+# the release jar and with the built jar): renders both page by page and
+# counts differing pixels with ImageMagick. Pages that differ get a highlight
+# image in a kept temp directory. Exit status 1 when anything differs.
+cmd_pdfdiff() {
+    [[ $# -eq 2 ]] || die "Usage: scripts/tlatex-dev.sh pdfdiff <a.pdf> <b.pdf>"
+    require pdftoppm
+    require pdfinfo
+    require compare
+    local a="$1" b="$2" dpi=110
+    [[ -f "${a}" ]] || die "PDF not found: ${a}"
+    [[ -f "${b}" ]] || die "PDF not found: ${b}"
+    local pa pb n i ae differ=0 work
+    pa="$(pdfinfo "${a}" | awk '/^Pages:/{print $2}')"
+    pb="$(pdfinfo "${b}" | awk '/^Pages:/{print $2}')"
+    work="$(mktemp -d "${TMPDIR:-/tmp}/tlatex-pdfdiff.XXXXXX")"
+    [[ "${pa}" == "${pb}" ]] || { warn "page count differs: ${a} has ${pa}, ${b} has ${pb}"; differ=1; }
+    n=$(( pa < pb ? pa : pb ))
+    for (( i = 1; i <= n; i++ )); do
+        pdftoppm -r "${dpi}" -f "${i}" -l "${i}" -png -singlefile "${a}" "${work}/a-${i}"
+        pdftoppm -r "${dpi}" -f "${i}" -l "${i}" -png -singlefile "${b}" "${work}/b-${i}"
+        # `compare` prints the AE (absolute error: differing pixel count) on stderr
+        # and exits 1 when the images differ, 2 on error (e.g. size mismatch).
+        ae="$(compare -metric AE "${work}/a-${i}.png" "${work}/b-${i}.png" "${work}/diff-${i}.png" 2>&1 || true)"
+        if [[ "${ae}" == "0" ]]; then
+            rm -f "${work}/diff-${i}.png"
+        else
+            differ=$((differ + 1))
+            warn "  page ${i}: ${ae} differing pixel(s) -> ${work}/diff-${i}.png (red = changed)"
+        fi
+    done
+    if [[ "${differ}" -eq 0 ]]; then
+        rm -rf "${work}"
+        log "pdfdiff: ${n} page(s) pixel-identical at ${dpi} dpi."
+    else
+        die "pdfdiff: differences found. Rendered pages and highlights kept in ${work}"
+    fi
+}
+
 cmd_restore() {
     require git
     log "Restoring release tools/tla2tools.jar from git"
@@ -340,6 +404,8 @@ main() {
         install) cmd_install "$@" ;;
         dev)     cmd_dev "$@" ;;
         typeset) cmd_typeset "$@" ;;
+        render)  cmd_render "$@" ;;
+        pdfdiff) cmd_pdfdiff "$@" ;;
         golden)  cmd_golden "$@" ;;
         regress) cmd_regress "$@" ;;
         check)   cmd_check "$@" ;;

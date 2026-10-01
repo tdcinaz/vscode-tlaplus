@@ -32,7 +32,8 @@ Inside `tlaplus/`, `origin` is our fork and `upstream` is `tlaplus/tlaplus`.
 
 1. **Open in the Dev Container** (`Dev Containers: Reopen in Container`). The
    container includes a **JDK 17**, **Ant**, **TeX Live**, **Node 22**, the
-   **GitHub CLI**, and **Claude Code**, plus the recommended VS Code extensions
+   **GitHub CLI**, **poppler-utils** (PDF to PNG/text), **ImageMagick**,
+   **shellcheck**, and **Claude Code**, plus the recommended VS Code extensions
    (Java pack, LaTeX Workshop, Claude Code). On create it runs
    `npm install && npm run tlatex:setup`. This is the reproducible environment,
    so every teammate and every agent session gets the same toolchain. The
@@ -66,7 +67,9 @@ Edit Java under `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/`, then:
 | Rebuild jar + swap into the extension | `npm run tlatex:dev` |
 | Just rebuild the jar | `npm run tlatex:build` |
 | Just copy the built jar into `./tools` | `npm run tlatex:install` |
-| Typeset spec(s) from the CLI (no VS Code) | `bash scripts/tlatex-dev.sh typeset path/to/Spec.tla [...]` |
+| Typeset spec(s) from the CLI (no VS Code); fails on LaTeX errors | `bash scripts/tlatex-dev.sh typeset path/to/Spec.tla [...]` |
+| Look at the result: render a PDF page to PNG (`all` for every page) | `bash scripts/tlatex-dev.sh render path/to/Spec.tla [page\|all] [dpi]` |
+| Visual regression: pixel-compare two PDFs page by page | `bash scripts/tlatex-dev.sh pdfdiff before.pdf after.pdf` |
 | Release jar vs built jar: `.tex` must be identical for the specs in `tests/tlatex-regress.txt` | `npm run tlatex:regress` (or `bash scripts/tlatex-dev.sh regress 20` for the first 20) |
 | Regenerate the golden `.tex` files after an *intended* output change | `npm run tlatex:golden` |
 | Full verification before pushing (what CI runs) | `npm run tlatex:check` |
@@ -166,6 +169,29 @@ one with:
 ```sh
 bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
 ```
+
+## Inspecting typeset output
+
+Typesetting produces a PDF, which neither a diff nor an agent can read
+directly. Two commands turn it into something inspectable:
+
+- `bash scripts/tlatex-dev.sh render Spec.tla [page|all] [dpi]` writes
+  `Spec-p<N>.png` next to the PDF (gitignored under the fixtures). Open the
+  PNG in the editor, or let an agent read it. 110 dpi is enough to judge
+  layout and symbols; use 200 or more to check fine spacing.
+- `bash scripts/tlatex-dev.sh pdfdiff before.pdf after.pdf` renders both page
+  by page and counts differing pixels with ImageMagick. Pages that differ get a
+  highlight image (red marks the changed pixels) in a kept temp directory, and
+  the command exits non-zero. Typical use: typeset a spec with the release jar
+  (`tools/tla2tools.jar`, or `git show HEAD:tools/tla2tools.jar`) and with the
+  built jar, then compare the two PDFs.
+
+`pdftotext Spec.pdf -` is handy for a quick textual look, and
+`pdfinfo Spec.pdf` for page counts.
+
+The GitHub CLI is authenticated per user (`gh auth login`); with it,
+`gh run list --workflow tlatex.yml` and `gh run watch` follow the CI job that
+mirrors `npm run tlatex:check`.
 
 ## Guard hooks
 

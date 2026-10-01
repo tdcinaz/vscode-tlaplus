@@ -33,11 +33,16 @@ npm run tlatex:regress   # release jar vs built jar: identical .tex for tests/tl
 npm run tlatex:dev       # rebuild tla2tools.jar and swap it into ./tools
 npm run tlatex:check     # build + test + typeset fixtures + regress (what CI runs)
 bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla   # fails on LaTeX errors
+bash scripts/tlatex-dev.sh render tests/fixtures/tlatex/MacroOperators.tla     # PDF page -> PNG, to look at the result
+bash scripts/tlatex-dev.sh pdfdiff before.pdf after.pdf                       # pixel diff, highlights kept in a temp dir
 npm run tlatex:restore   # put the released jar back
 ```
 
 Extension side (TypeScript): `npm run compile`, `npm run lint`, `npm test`
 (VS Code must not be open when running `npm test` from a terminal).
+
+CI: `gh run list --workflow tlatex.yml` / `gh run watch` (after `gh auth login`).
+Lint the dev script with `shellcheck -S warning scripts/tlatex-dev.sh`.
 
 ## Rules for agents and humans
 
