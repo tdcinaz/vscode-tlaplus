@@ -21,8 +21,16 @@
     // tlatex:setup, so every teammate (and agent) starts from the same state.
     "postCreateCommand": "npm install && npm run tlatex:setup",
     "mounts": [
-        // Persist Claude Code auth/history across container rebuilds.
-        "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+        // Share the host's ~/.claude (settings, memory, project history) with the
+        // container user. The directory must exist on the host; installing Claude
+        // Code creates it. HOME/USERPROFILE covers macOS/Linux and Windows hosts.
+        // Note: on macOS the host login lives in the Keychain, not here, so to
+        // avoid a separate container sign-in, seed the token the container reads
+        // from the Keychain once (re-run if you log in again on the host):
+        //   security find-generic-password -s "Claude Code-credentials" -w \
+        //     > ~/.claude/.credentials.json && chmod 600 ~/.claude/.credentials.json
+        // The container then refreshes that file itself via the refresh token.
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/node/.claude,type=bind,consistency=cached"
         // Add folders with test TLA+ specs, e.g.
         // {"source": "path/to/folder", "target": "/workspaces/folder", "type": "bind"}
     ],

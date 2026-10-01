@@ -35,8 +35,9 @@ Inside `tlaplus/`, `origin` is our fork and `upstream` is `tlaplus/tlaplus`.
    **GitHub CLI**, and **Claude Code**, plus the recommended VS Code extensions
    (Java pack, LaTeX Workshop, Claude Code). On create it runs
    `npm install && npm run tlatex:setup`. This is the reproducible environment,
-   so every teammate and every agent session gets the same toolchain. Claude
-   Code's auth and history persist in a named volume across rebuilds.
+   so every teammate and every agent session gets the same toolchain. The
+   host's `~/.claude` directory is bind-mounted into the container, so Claude
+   Code settings, memory, and history are shared and survive rebuilds.
 
 2. **Verify prerequisites and set up the submodule:**
 
@@ -186,6 +187,11 @@ language server imports them through Maven and rewrites them, which dirties the
 submodule. [.vscode/settings.json](../.vscode/settings.json) prevents this: it
 disables Maven import, so `org.lamport.tlatools` is imported from its own
 `.classpath`, and it excludes the Toolbox and other projects.
+
+`npm run tlatex:setup` also adds a per-clone entry to the submodule's
+`.git/info/exclude` for the encoding prefs file the language server drops into
+the sibling `org.lamport.tlatools.*` projects, so those never show up in
+`git status`. Nothing is pushed to the fork for this.
 
 If the submodule shows modified `.project` files or new `.settings/*.prefs`
 anyway, they are generated, so discard them and reset the language server:
