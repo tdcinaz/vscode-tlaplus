@@ -1,7 +1,11 @@
-# TLATeX overhaul — Phase 1 proposal
+# TLATeX overhaul — Phase 1 proposal (source changes)
 
-*Status: proposal, 2026-10-01. Analysis of `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/`
-at submodule commit `3bae559` (fork branch `tlatex-overhaul`, no fork changes yet).*
+*Status: proposal, 2026-10-01. Analysis of
+`tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/` at fork commit `fbceae3`,
+which adds tests and two reset hooks but changes no typesetting behaviour.
+The build, test and regression infrastructure this plan relies on is in place;
+its findings and design are in [TLATEX_HARNESS_NOTES.md](TLATEX_HARNESS_NOTES.md)
+and the commands in [TLATEX_DEV.md](TLATEX_DEV.md).*
 
 ## 1. Recommendation in brief
 
@@ -9,27 +13,12 @@ Phase 1 should deliver the author's "simpler possibility" from the README first
 (identifier → TeX symbol, `alpha` → `\alpha`), then the full operator → macro
 rewrite restricted to single-line applications, both driven by a small
 directive notation that lives in comments. Everything is opt-in, so a spec with
-no directives typesets byte-for-byte as it does today.
+no directives typesets byte-for-byte as it does today, and the release-vs-built
+regression (`npm run tlatex:regress`) must stay empty throughout.
 
-Before any of that, two things have to happen because nothing else can be
-verified without them:
-
-1. **The Java build is broken in this workspace.** `npm run tlatex:build` runs
-   the Ant `info` target, which depends on a jgit build-number task that walks
-   full git history. The submodule is a depth-1 clone, so it fails with
-   `MissingObjectException` before compiling a single file. Passing the
-   `git.*` properties from plain git and skipping `info` builds in 48 s.
-   CI checks out the submodule the same way and will fail the same way.
-2. **There is no test infrastructure**, and the pipeline has three traits that
-   fight JUnit: all state is static with no reset, alignment needs a real LaTeX
-   run, and LaTeX failures are swallowed (only a *negative* exit code is an
-   error). A thin test harness that runs the pipeline without LaTeX, plus a
-   byte-identical regression check against the existing 649 specs in
-   `test-model/`, is the safety net every later item relies on.
-
-Work items in order: **P1-0 harness → P1-1 shared emitter → P1-2 directives →
-P1-3 symbols → P1-4 macros → P1-5 hygiene.** Items P1-0 through P1-3 are small
-and low-risk; P1-4 is the only medium-risk item and is deliberately scoped.
+Work items in order: **P1-1 shared emitter → P1-2 directives → P1-3 symbols →
+P1-4 macros → P1-5 hygiene.** P1-1 through P1-3 and P1-5 are small and
+low-risk; P1-4 is the only medium-risk item and is deliberately scoped.
 
 ## 2. What the code looks like today
 
@@ -61,7 +50,8 @@ Facts that shape the design:
   (the `.sty` remaps letter mathcodes to text italic), so a TeX symbol such as
   `\alpha` can be dropped in place of the identifier. In comments, TLA tokens
   are wrapped in `\ensuremath{}` ([FormatComments.java:1926](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/FormatComments.java#L1926)),
-  so the same substitution works there.
+  so the same substitution works there. Today `alpha * x` renders as
+  `alpha \.{*} x` and `Integral(1, 0, 10)` as `Integral ( 1 ,\, 0 ,\, 10 )`.
 - **The symbol table cannot be extended at runtime.** `add`/`pcaladd` are
   private; there is no public registration method.
 - **The tokenizer tracks no parenthesis depth** (only comment depth, module
@@ -69,7 +59,8 @@ Facts that shape the design:
   `( [ { <<` as `Symbol.LEFT_PAREN` and `) ] } >>` as `RIGHT_PAREN`
   ([BuiltInSymbols.java:277-285](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/BuiltInSymbols.java#L277)),
   and `,` as `PUNCTUATION`, so argument capture can be a post-tokenization
-  pass over `Token[][]` rather than an FSM change.
+  pass over `Token[][]` rather than an FSM change. `TokenizeSpecTest`
+  already pins these token shapes.
 - **Subscript machinery exists.** `WF_x`, `]_v`, `^` already produce
   `_{...}` / `^{...}` via `Symbol.SUBSCRIPTED` and the per-token `subscript`
   flag; the macro rewrite does not need to invent this.
@@ -92,9 +83,11 @@ Facts that shape the design:
 
 - About 13 300 lines of pre-Java-5 code: raw `Vector`/`Hashtable`/`Enumeration`
   everywhere, zero generics, all state in `public static` fields.
-  `Parameters.java` has 30 static option fields and no reset; `TokenizeSpec`
-  and `TokenizeComment` keep their FSM state in statics. The build targets
-  Java 11 (`java.release=11`), so new code may use modern constructs.
+  `Parameters.java` has 30 static option fields; `TokenizeSpec` and
+  `TokenizeComment` keep their FSM state in statics (the test support resets
+  these between specs via `TokenizeSpec.reset()` / `TokenizeComment.reset()`).
+  The build targets Java 11 (`java.release=11`), so new code may use modern
+  constructs.
 - `TeX.java` duplicates roughly 40-50 % of `TLA.java` (driver skeleton,
   helpers, option parsing).
 - Platform-default charsets in every reader/writer (`FileCharReader.java:28`,
@@ -103,7 +96,8 @@ Facts that shape the design:
 - `ExecuteCommand` uses `Runtime.exec(String)` (breaks on paths with spaces)
   and treats only `errorCode < 0` as failure
   ([ExecuteCommand.java:38](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/ExecuteCommand.java#L38)),
-  so a LaTeX error (exit 1 under `\batchmode`) is silent.
+  so a LaTeX error (exit 1 under `\batchmode`) is silent. The dev script
+  compensates by reading the `.log`; the Java should stop needing that.
 - Leftover debug output: `prependMetaDirToFileName` prints
   `looking for file: ...` on every call ([LaTeXOutput.java:1581](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/LaTeXOutput.java#L1581)).
   The success message always says `dvi` even when `-latexCommand pdflatex`
@@ -115,22 +109,6 @@ Facts that shape the design:
   `BuiltInSymbols.java:426-427`, and the capitalisation rule in
   `FormatComments.java:683-716`.
 
-### Harness
-
-- `scripts/tlatex-dev.sh build` fails as described in §1. `test` warns but
-  does not fail when no tests match; `typeset` checks only Java's exit code,
-  never the LaTeX `.log`; `check` therefore cannot currently detect a LaTeX
-  error.
-- `test/tla2tex/` does not exist. `compile-test` compiles only `test/` and
-  copies only `*.dot`/`*.dump` resources; existing suites locate inputs via
-  `System.getProperty("basedir")` + `test-model/`
-  ([TestDecimalXMLExport.java:38-40](../tlaplus/tlatools/org.lamport.tlatools/test/tla2sany/xml/TestDecimalXMLExport.java#L38)).
-  The `test-set` target forks one JVM per test class (`forkmode="perTest"`)
-  and binds a debug port (1044), so static leaks only matter within a class.
-- Baseline: all four fixtures typeset with the freshly built jar with zero
-  LaTeX errors and zero overfull boxes. `alpha * x` renders today as
-  `alpha \.{*} x`; `Integral(1, 0, 10)` as `Integral ( 1 ,\, 0 ,\, 10 )`.
-
 ## 3. Phase 1 scope
 
 **Goals**
@@ -138,8 +116,10 @@ Facts that shape the design:
 - A spec author can declare, in the spec itself, that an identifier typesets as
   a TeX symbol and that an operator application typesets as a TeX macro with
   its arguments substituted.
-- Output for specs without directives is unchanged.
-- Every behaviour has a JUnit test; the harness can prove "unchanged" mechanically.
+- Output for specs without directives is unchanged (regression stays empty).
+- Every behaviour change ships with a JUnit test under `test/tla2tex/` and,
+  where it concerns new input shapes, a spec in `test-model/tla2tex/` with a
+  reviewed golden.
 
 **Non-goals for phase 1 (deferred, see §6)**
 
@@ -149,53 +129,12 @@ README bugs 1/3/4.
 
 ## 4. Work items
 
-### P1-0 Harness repair and test infrastructure (extension repo + fork) — small
-
-*Status 2026-10-01: implemented (uncommitted at the time of writing). Two
-further defects surfaced while doing it and are fixed as part of P1-0: the
-VS Code Java language server compiles test sources into `class/` (the Eclipse
-output folder) without JUnit, and those copies shadowed Ant's `test-class`
-output; and `TokenizeComment` never resets its quote state, so an unbalanced
-`` ` `` in one spec's comments made every identifier in the next spec's
-comments a TLA token when several specs run in one JVM.*
-
-1. In `cmd_build` and `cmd_test`, stop invoking `info`; pass
-   `-Dgit.revision=$(git rev-parse HEAD) -Dgit.shortRevision=... -Dgit.branch=... -Dgit.tag=`
-   and call `compile compile-test dist` directly. Verified to work in this
-   container. Alternative (rejected): `fetch --unshallow`, which costs every
-   teammate and CI a full clone of `tlaplus/tlaplus`.
-2. `cmd_typeset`: after each run, fail if the `.log` contains a line starting
-   with `!`, and report overfull boxes as a warning. Also fail when
-   `-latexCommand` is given but the `.pdf` is missing.
-3. `cmd_test`: fail (not warn) when the glob matches nothing, so CI cannot pass
-   on an empty suite.
-4. New `cmd_regress`: typeset a configurable list of `test-model/*.tla` specs
-   (start with ~50 that have no PlusCal and parse in the released jar) with the
-   released jar and the built jar, `-nops`, LaTeX not run (see 5), and `diff`
-   the `.tex`. Phase 1 changes must keep this diff empty.
-5. Fork: add `TLA2TexTestSupport` under `test/tla2tex/` that
-   - resets `Parameters` and tokenizer statics before each test (add a
-     package-private `TokenizeSpec.reset()` and `Parameters.reset()`; these are
-     the only new statics-touching methods),
-   - runs the pipeline on a string via `VectorCharReader` through
-     `WriteLaTeXFile` **without** `RunLaTeX`/`SetDimensions`, so every
-     `preSpace` is 0 and no LaTeX is needed in unit tests,
-   - optionally runs `pdflatex` when it is on `PATH` (tagged tests, skipped
-     otherwise).
-   Golden files live under `test-model/tla2tex/` next to their `.tla`, found
-   via the `basedir` property like the SANY tests.
-6. Copy the four fixtures into `test-model/tla2tex/` so the fork's tests are
-   self-contained (CI for the fork alone must not depend on this repo).
-
-Acceptance: `npm run tlatex:check` passes in the dev container and CI; a
-deliberately injected LaTeX error in a fixture makes it fail.
-
 ### P1-1 Single token-emission path — small
 
 Extract the two `switch (tok.type)` bodies into one package-private class,
 `TokenRenderer`, with a method that returns the TeX string for a token given
 its context (previous/next token, subscript state). Both `InnerWrite*` methods
-call it. No behaviour change; `cmd_regress` must show an empty diff.
+call it. No behaviour change: goldens unchanged, regression empty.
 
 Rationale: P1-3 and P1-4 change what a token renders as. Doing it in one place
 is the only way to guarantee the alignment pass measures what the output
@@ -234,7 +173,8 @@ comments:
 
 Implementation: new class `Directives` (parser + the two tables: ident → TeX,
 operator name/arity → template). Unit tests on the parser, including malformed
-lines, duplicate definitions, and arity mismatch.
+lines, duplicate definitions, and arity mismatch. A spec with only directive
+lines and no uses must produce the same body as the spec without them.
 
 ### P1-3 Identifier → symbol substitution — small
 
@@ -249,9 +189,10 @@ lines, duplicate definitions, and arity mismatch.
   machinery rather than competing with it.
 - `-tlaOut` output is unaffected (it writes the original strings).
 
-Tests: golden `.tex` for `GreekOperators.tla` with and without the preset;
-unit tests for `alpha'`, `WF_alpha`, `alpha(x)`, `alpha` in a comment with and
-without `-tlaComment`.
+Tests: a copy of `GreekOperators.tla` with the `preset greek` directive as a
+new golden spec; unit tests via `latexWithoutAlignment` for `alpha'`,
+`WF_alpha`, `alpha(x)`, and `alpha` in a comment with and without
+`-tlaComment`.
 
 ### P1-4 Operator application → TeX macro, single-line scope — medium
 
@@ -287,14 +228,15 @@ single-line cases (`MacroOperators.tla`) from the multi-line ones.
 
 Tests: unit tests for the span finder over hand-built `Token[][]` (nested
 parens, set literal with commas, tuple, `seq[2]`, arity mismatch, unclosed
-paren at end of line, nested macro heads); golden `.tex` for
-`MacroOperators.tla`; a fixture check that `NestedArguments.tla` still typesets
-with `N3` rendered the old way; `cmd_regress` diff empty.
+paren at end of line, nested macro heads); a directive-bearing copy of
+`MacroOperators.tla` as a golden spec; `NestedArguments.tla` with directives
+must still typeset, with `N3` rendered the old way; `render`/`pdfdiff` to
+eyeball the first real PDFs; regression empty.
 
 ### P1-5 Hygiene fixes — small, each with a test
 
-Small, test-covered, contained changes that improve every user and make the
-harness honest:
+Small, test-covered, contained changes that improve every user and let the
+harness stop compensating:
 
 | Fix | Where |
 | --- | --- |
@@ -304,19 +246,23 @@ harness honest:
 | README bug 2: do not split `WF_`/`SF_` when the preceding token is `.` | `TokenizeSpec.java:996-1000` |
 | Read `.tla` and write `.tex` as UTF-8 explicitly | `FileCharReader.java:28`, `OutputFileWriter.java:23` (open question 4) |
 
+The first item is testable end to end: `TypesetWithLaTeXTest` can then assert
+a non-zero exit for a spec with a bad `` `^ ... ^' `` region instead of
+reading the log.
+
 ## 5. Sequencing and estimates
 
 | Item | Depends on | Risk | Size |
 | --- | --- | --- | --- |
-| P1-0 harness + tests | — | low | S |
-| P1-1 shared renderer | P1-0 | low (regress-guarded) | S |
-| P1-2 directives | P1-0 | low | S |
+| P1-1 shared renderer | — | low (regression-guarded) | S |
+| P1-2 directives | — | low | S |
 | P1-3 symbols | P1-1, P1-2 | low | S |
 | P1-4 macros | P1-1, P1-2 | medium | M |
-| P1-5 hygiene | P1-0 | low | S |
+| P1-5 hygiene | — | low | S |
 
-P1-0 and P1-5 can proceed in parallel with P1-1/P1-2. Each item is one fork
-commit prefixed `tla2tex:` plus a pointer bump, per CLAUDE.md rule 3.
+P1-5 can proceed in parallel with P1-1/P1-2. Each item is one fork commit
+prefixed `tla2tex:` plus a pointer bump, per CLAUDE.md rule 3, and each must
+leave `npm run tlatex:check` green.
 
 ## 6. Explicitly deferred to phase 2+
 
@@ -333,15 +279,16 @@ commit prefixed `tla2tex:` plus a pointer bump, per CLAUDE.md rule 3.
 
 ## 7. Risks
 
-- **Alignment regressions** are the main risk and the reason for `cmd_regress`
-  and the "decline when unsafe" rule in P1-4.
-- **Static state in tests**: mitigated by the reset methods and the per-class
-  JVM fork Ant already uses.
-- **Upstream sync**: all changes stay under `src/tla2tex`, `test/tla2tex`,
-  `test-model/tla2tex`; the only shared file touched is none (the build fix is
-  in this repo's script, not `customBuild.xml`).
+- **Alignment regressions** are the main risk and the reason for the
+  release-vs-built regression and the "decline when unsafe" rule in P1-4.
+- **Upstream sync**: all phase 1 changes stay under `src/tla2tex`,
+  `test/tla2tex`, `test-model/tla2tex`. The only upstream file the fork has
+  touched is the `test-set` classpath order in `customBuild.xml`.
 - **Directive syntax churn**: pick it once (open question 1); it becomes part
   of users' specs.
+- **Comment-side substitution** depends on the existing `isTLA` heuristics,
+  which are themselves fragile (README bug 4). Keep it opt-in via directives
+  so a wrong classification only affects specs that asked for symbols.
 
 ## 8. Decisions needed
 

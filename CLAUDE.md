@@ -6,7 +6,10 @@ the *workspace and test harness*; the typesetter source lives in the `tlaplus/`
 git submodule (our fork `tdcinaz/tlaplus`, branch `tlatex-overhaul`).
 
 Full workflow guide: [docs/TLATEX_DEV.md](docs/TLATEX_DEV.md). Read it before
-touching the Java.
+touching the Java. The phase 1 plan for the source is
+[docs/TLATEX_PHASE1_PROPOSAL.md](docs/TLATEX_PHASE1_PROPOSAL.md); the harness
+and test-infrastructure findings behind it are in
+[docs/TLATEX_HARNESS_NOTES.md](docs/TLATEX_HARNESS_NOTES.md).
 
 ## Where things are
 
