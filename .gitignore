@@ -7,10 +7,6 @@ version
 
 test-results/
 
-# Local checkout of the tla2tools (TLATeX) Java source, managed by
-# scripts/tlatex-dev.sh. Coordinates are pinned in .tlatools.env instead.
-.tlatools/
-
 # TLATeX output produced when typesetting the sample specs.
 tests/fixtures/tlatex/*.tex
 tests/fixtures/tlatex/*.dvi

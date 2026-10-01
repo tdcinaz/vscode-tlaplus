@@ -7,6 +7,7 @@
 node_modules/
 out/src/
 out/tests/
+tlaplus/
 out/*.map
 # include out/check-result-view.css
 # include out/check-result-view.js

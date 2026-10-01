@@ -4,17 +4,17 @@
 #
 # TLATeX is the Java typesetter (tla2tex.TLA) that lives in the tlaplus/tlaplus
 # repo and ships inside tla2tools.jar. This extension only shells out to that
-# jar. This script clones the Java source, builds a fresh tla2tools.jar, runs
-# the tla2tex JUnit tests, and swaps the jar into this extension so you can
+# jar. This script checks out the Java source, builds a fresh tla2tools.jar,
+# runs the tla2tex JUnit tests, and swaps the jar into this extension so you can
 # exercise "Export module to LaTeX/PDF" end to end.
 #
-# All source coordinates are pinned in .tlatools.env (committed) so every
-# teammate builds from the exact same fork/branch. Override per-shell with the
-# TLATOOLS_REPO / TLATOOLS_REF environment variables.
+# The Java source is the ./tlaplus git submodule (our fork of tlaplus/tlaplus,
+# branch tlatex-overhaul; see .gitmodules). The extension repo pins the exact
+# submodule commit, so every teammate builds from the same source.
 #
 # Usage:
 #   scripts/tlatex-dev.sh doctor              Check prerequisites (JDK, Ant, git)
-#   scripts/tlatex-dev.sh setup               Clone/update the tla2tools source
+#   scripts/tlatex-dev.sh setup               Init the ./tlaplus submodule at the pinned commit
 #   scripts/tlatex-dev.sh build               Compile + package dist/tla2tools.jar
 #   scripts/tlatex-dev.sh test [glob]         Run tla2tex JUnit tests (default tla2tex/*)
 #   scripts/tlatex-dev.sh install             Copy built jar into ./tools (+ ./out/tools)
@@ -24,24 +24,15 @@
 #
 set -euo pipefail
 
-# --- locate repo root and load pinned coordinates ---------------------------
+# --- locate repo root and the tlaplus submodule ------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Defaults; overridden by .tlatools.env, then by the environment.
-TLATOOLS_REPO="${TLATOOLS_REPO:-https://github.com/tlaplus/tlaplus.git}"
-TLATOOLS_REF="${TLATOOLS_REF:-master}"
-TLATOOLS_DIR="${TLATOOLS_DIR:-.tlatools}"
-
-if [[ -f "${REPO_ROOT}/.tlatools.env" ]]; then
-    # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.tlatools.env"
-fi
-
+SUBMODULE_DIR="tlaplus"
 # The Ant project lives in a fixed sub-path of the tlaplus repo.
 TOOLS_SUBDIR="tlatools/org.lamport.tlatools"
-BUILD_DIR="${REPO_ROOT}/${TLATOOLS_DIR}/${TOOLS_SUBDIR}"
+BUILD_DIR="${REPO_ROOT}/${SUBMODULE_DIR}/${TOOLS_SUBDIR}"
 BUILT_JAR="${BUILD_DIR}/dist/tla2tools.jar"
 TARGET_JAR="${REPO_ROOT}/tools/tla2tools.jar"
 
@@ -66,25 +57,33 @@ cmd_doctor() {
     fi
     command -v pdflatex >/dev/null 2>&1 && log "  pdflatex: present (needed for PDF export)" \
         || warn "  pdflatex: MISSING (only needed for 'typeset' / PDF export)"
-    log "  source repo: ${TLATOOLS_REPO}"
-    log "  source ref:  ${TLATOOLS_REF}"
+    log "  source repo: $(git config -f .gitmodules "submodule.${SUBMODULE_DIR}.url")"
+    log "  source:      $(git submodule status "${SUBMODULE_DIR}")"
     [[ ${ok} -eq 0 ]] && log "All required prerequisites present." || die "Missing prerequisites (see above)."
 }
 
 cmd_setup() {
     require git
-    if [[ -d "${TLATOOLS_DIR}/.git" ]]; then
-        log "Updating ${TLATOOLS_DIR} -> ${TLATOOLS_REF}"
-        git -C "${TLATOOLS_DIR}" remote set-url origin "${TLATOOLS_REPO}"
-        git -C "${TLATOOLS_DIR}" fetch --depth 1 origin "${TLATOOLS_REF}"
-        git -C "${TLATOOLS_DIR}" checkout -q FETCH_HEAD
-    else
-        log "Cloning ${TLATOOLS_REPO} (${TLATOOLS_REF}) into ${TLATOOLS_DIR}"
-        git clone --depth 1 --branch "${TLATOOLS_REF}" "${TLATOOLS_REPO}" "${TLATOOLS_DIR}" \
-            || git clone --depth 1 "${TLATOOLS_REPO}" "${TLATOOLS_DIR}"
+    log "Initializing ${SUBMODULE_DIR} submodule at the pinned commit"
+    git submodule sync -- "${SUBMODULE_DIR}"
+    git submodule update --init --depth 1 -- "${SUBMODULE_DIR}"
+    local branch
+    branch="$(git config -f .gitmodules "submodule.${SUBMODULE_DIR}.branch")"
+    # The shallow clone only knows its default branch; also track the working
+    # branch and upstream master so commits/pushes/syncs work from inside it.
+    git -C "${SUBMODULE_DIR}" config --replace-all remote.origin.fetch \
+        "+refs/heads/${branch}:refs/remotes/origin/${branch}" "refs/heads/${branch}:"
+    git -C "${SUBMODULE_DIR}" remote get-url upstream >/dev/null 2>&1 \
+        || git -C "${SUBMODULE_DIR}" remote add -t master upstream https://github.com/tlaplus/tlaplus.git
+    git -C "${SUBMODULE_DIR}" fetch -q --depth 1 origin "${branch}" \
+        || warn "Could not fetch origin/${branch}; continuing at the pinned commit."
+    if [[ -z "$(git -C "${SUBMODULE_DIR}" symbolic-ref -q HEAD)" ]]; then
+        # Fresh init leaves a detached HEAD; put it on the working branch.
+        git -C "${SUBMODULE_DIR}" checkout -q -B "${branch}"
+        git -C "${SUBMODULE_DIR}" branch -q --set-upstream-to="origin/${branch}" 2>/dev/null || true
     fi
-    [[ -d "${BUILD_DIR}" ]] || die "Expected ${TOOLS_SUBDIR} not found in the cloned repo. Wrong TLATOOLS_REPO?"
-    log "Source ready at ${BUILD_DIR}"
+    [[ -d "${BUILD_DIR}" ]] || die "Expected ${TOOLS_SUBDIR} not found in the ${SUBMODULE_DIR} submodule."
+    log "Source ready at ${BUILD_DIR} (branch: $(git -C "${SUBMODULE_DIR}" branch --show-current))"
 }
 
 ensure_source() {

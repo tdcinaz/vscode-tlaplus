@@ -1,0 +1,5 @@
+[submodule "tlaplus"]
+	path = tlaplus
+	url = https://github.com/tdcinaz/tlaplus.git
+	branch = tlatex-overhaul
+	shallow = true

@@ -16,33 +16,36 @@ tla2tex tests and/or swap the jar into this extension and use *Export module to
 LaTeX/PDF*.** The [scripts/tlatex-dev.sh](../scripts/tlatex-dev.sh) helper (and
 matching `npm run tlatex:*` scripts) automate every step.
 
+## Where the source lives
+
+The Java source is the **`tlaplus/` git submodule**, our fork
+[`tdcinaz/tlaplus`](https://github.com/tdcinaz/tlaplus) on branch
+**`tlatex-overhaul`** (see [.gitmodules](../.gitmodules)). This repo records the
+exact submodule commit it builds against, so checking out any extension commit
+also tells you which Java source goes with it.
+
+Inside `tlaplus/`, `origin` is our fork and `upstream` is `tlaplus/tlaplus`.
+
 ## One-time setup
 
 1. **Open in the Dev Container** (`Dev Containers: Reopen in Container`). The
-   container now includes a **JDK 17**, **Ant**, **LaTeX**, and Node; `npm
-   install` runs automatically on create. This is the reproducible environment —
-   every teammate gets an identical toolchain.
+   container includes a **JDK 17**, **Ant**, **LaTeX**, and Node. On create it
+   runs `git submodule update --init --depth 1 && npm install`. This is the
+   reproducible environment, so every teammate gets the same toolchain.
 
-2. **Pin the source.** Edit [.tlatools.env](../.tlatools.env) and point it at
-   your team's fork + working branch of `tlaplus/tlaplus`:
-
-   ```sh
-   TLATOOLS_REPO=https://github.com/<your-org>/tlaplus.git
-   TLATOOLS_REF=tlatex-overhaul
-   ```
-
-   Commit this file — it is how everyone builds from the same source.
-
-3. **Verify prerequisites and fetch the source:**
+2. **Verify prerequisites and set up the submodule:**
 
    ```sh
    npm run tlatex:doctor   # confirms JDK/Ant/git are present
-   npm run tlatex:setup    # shallow-clones the Java source into ./.tlatools (gitignored)
+   npm run tlatex:setup    # inits ./tlaplus at the pinned commit, on branch tlatex-overhaul
    ```
+
+   `setup` is safe to re-run. It also configures the shallow clone so it can
+   fetch/push `tlatex-overhaul` and fetch `upstream/master`.
 
 ## Inner loop
 
-Edit Java under `.tlatools/tlatools/org.lamport.tlatools/src/tla2tex/`, then:
+Edit Java under `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/`, then:
 
 | Goal | Command |
 | --- | --- |
@@ -94,19 +97,63 @@ one with:
 bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
 ```
 
+## Committing Java changes (two steps)
+
+A submodule is its own repo. Commit the Java change in the fork, then commit the
+updated submodule pointer in this repo:
+
+```sh
+# 1. In the fork
+cd tlaplus
+git add -A && git commit -m "tla2tex: ..."
+git push origin tlatex-overhaul
+
+# 2. In the extension repo: record the new submodule commit
+cd ..
+git add tlaplus
+git commit -m "Bump tlaplus submodule: ..."
+git push
+```
+
+Always **push the fork first**. If you push the extension repo while it points at
+a commit that only exists on your machine, teammates' `git submodule update`
+fails.
+
+To pick up a teammate's work, run `git pull` then `npm run tlatex:setup` (or
+`git submodule update`). To move to the fork's latest `tlatex-overhaul`, even
+if it's ahead of the pinned commit, run `git -C tlaplus pull` and commit the
+bump as in step 2.
+
+> `git submodule update` checks out the pinned commit as a detached HEAD. Run
+> `npm run tlatex:setup` afterwards (or `git -C tlaplus switch tlatex-overhaul`)
+> before you commit inside `tlaplus/`.
+
+## Syncing with upstream tlaplus
+
+```sh
+cd tlaplus
+git fetch --depth 50 upstream master   # deepen as needed for the merge base
+git merge upstream/master              # or: git rebase upstream/master
+git push origin tlatex-overhaul
+cd .. && git add tlaplus && git commit -m "Sync tlaplus with upstream"
+```
+
+The submodule is shallow (`--depth 1`) to keep clones fast. If a merge/rebase
+complains about missing history, run `git -C tlaplus fetch --unshallow origin`.
+
 ## How it stays reproducible
 
 - The toolchain (JDK, Ant, LaTeX) is baked into the Dev Container image.
-- The exact source fork/branch is pinned in the committed `.tlatools.env`.
-- Every action is a single `npm run tlatex:*` command with no hidden state; the
-  cloned source lives in the gitignored `./.tlatools` and never pollutes the
-  extension's git history.
+- The exact Java source commit is pinned by the `tlaplus` submodule in this
+  repo's history.
+- Every action is a single `npm run tlatex:*` command. The submodule is excluded
+  from the packaged `.vsix` (see [.vscodeignore](../.vscodeignore)).
 
 A teammate reproduces the whole environment with:
 
 ```sh
-# after cloning this forked extension repo
-# (Reopen in Dev Container, which runs npm install)
+git clone --recurse-submodules --shallow-submodules https://github.com/tdcinaz/vscode-tlaplus.git
+# (Reopen in Dev Container, which inits the submodule and runs npm install)
 npm run tlatex:setup
 npm run tlatex:dev
 ```
