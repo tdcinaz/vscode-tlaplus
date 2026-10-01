@@ -28,9 +28,11 @@ npm run tlatex:doctor    # verify JDK 17 + Ant + git (+ pdflatex)
 npm run tlatex:setup     # init submodule on branch tlatex-overhaul, install hooks (idempotent)
 npm run tlatex:status    # branch/commit/dirty state of both repos, dev-jar status
 npm run tlatex:test      # JUnit tests matching test/tla2tex/*   (fast inner loop)
+npm run tlatex:golden    # regenerate test-model/tla2tex/*.golden.tex after an INTENDED output change
+npm run tlatex:regress   # release jar vs built jar: identical .tex for tests/tlatex-regress.txt
 npm run tlatex:dev       # rebuild tla2tools.jar and swap it into ./tools
-npm run tlatex:check     # build + test + typeset every fixture (what CI runs)
-bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
+npm run tlatex:check     # build + test + typeset fixtures + regress (what CI runs)
+bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla   # fails on LaTeX errors
 npm run tlatex:restore   # put the released jar back
 ```
 
@@ -56,9 +58,14 @@ Extension side (TypeScript): `npm run compile`, `npm run lint`, `npm test`
 6. **Keep fork changes confined to `tla2tex`** (its source, tests, and the
    minimal `customBuild.xml` wiring they need) so syncing with upstream
    `tlaplus/tlaplus` stays a clean merge.
-7. **Add a JUnit test with every behavior change** under `test/tla2tex/`, and a
+7. **Add a JUnit test with every behavior change** under `test/tla2tex/`
+   (call `TLA2TexTestSupport.resetStatics()` in `@Before`; use
+   `latexWithoutAlignment` so tests need no LaTeX). Put input specs in
+   `test-model/tla2tex/`; `GoldenLaTeXTest` compares each against its
+   `.golden.tex`, regenerated only via `tlatex:golden` and reviewed. Add a
    fixture under `tests/fixtures/tlatex/` when the change concerns new syntax.
-   Fixtures must parse with SANY and typeset without LaTeX errors.
+   Fixtures must parse with SANY and typeset without LaTeX errors. Output for
+   specs without new directives must stay byte-identical (`tlatex:regress`).
 8. **Typeset output is disposable.** `.tex/.dvi/.pdf/.log/.aux` next to
    fixtures are gitignored; do not commit them.
 9. **Do not reformat Java files you are not changing.** Upstream style is

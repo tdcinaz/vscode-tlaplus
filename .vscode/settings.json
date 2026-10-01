@@ -9,6 +9,13 @@
     // org.lamport.tlatools ships a complete .classpath, so import it as a plain
     // Eclipse project instead of via Maven (m2e), and skip the other projects.
     "java.import.maven.enabled": false,
+    // That .classpath sends compiler output to class/, the same directory the
+    // Ant build uses. With auto-build on, the language server compiles the
+    // test sources into class/ too (without JUnit, which is not on the Eclipse
+    // classpath), and those broken copies shadow Ant's test-class output.
+    // Build with `npm run tlatex:build`; run "Java: Force Java Compilation"
+    // only when you need the IDE's own compile.
+    "java.autobuild.enabled": false,
     "java.project.resourceFilters": [],
     "java.import.exclusions": [
         "**/node_modules/**",

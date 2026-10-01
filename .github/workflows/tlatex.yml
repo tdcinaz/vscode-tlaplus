@@ -1,6 +1,8 @@
 # Builds tla2tools.jar from the tlaplus submodule (our fork, branch
-# tlatex-overhaul), runs the tla2tex JUnit tests, and typesets every fixture in
-# tests/fixtures/tlatex/. Mirrors `npm run tlatex:check`.
+# tlatex-overhaul), runs the tla2tex JUnit tests, typesets every fixture in
+# tests/fixtures/tlatex/ (failing on LaTeX errors), and checks that the specs in
+# tests/tlatex-regress.txt produce identical .tex with the committed release jar
+# and the built jar. Mirrors `npm run tlatex:check`.
 #
 # `submodules: true` also enforces the "push the fork first" rule: a pointer to
 # a commit that is not on GitHub fails at checkout.
@@ -14,6 +16,7 @@ on:
       - '.gitmodules'
       - 'scripts/tlatex-dev.sh'
       - 'tests/fixtures/tlatex/**'
+      - 'tests/tlatex-regress.txt'
       - '.github/workflows/tlatex.yml'
   pull_request:
     paths:
@@ -21,12 +24,13 @@ on:
       - '.gitmodules'
       - 'scripts/tlatex-dev.sh'
       - 'tests/fixtures/tlatex/**'
+      - 'tests/tlatex-regress.txt'
       - '.github/workflows/tlatex.yml'
   workflow_dispatch:
 
 jobs:
   tlatex:
-    name: Build jar, run tla2tex tests, typeset fixtures
+    name: Build jar, run tla2tex tests, typeset fixtures, regression
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -44,7 +48,7 @@ jobs:
         sudo apt-get install -y --no-install-recommends ant ant-optional texlive-latex-base
     - name: Doctor
       run: bash scripts/tlatex-dev.sh doctor
-    - name: Build + test + typeset fixtures
+    - name: Build + test + typeset fixtures + regress
       run: bash scripts/tlatex-dev.sh check
     - name: Upload built jar
       if: always()

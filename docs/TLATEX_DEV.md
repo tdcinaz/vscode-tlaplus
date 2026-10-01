@@ -67,6 +67,8 @@ Edit Java under `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/`, then:
 | Just rebuild the jar | `npm run tlatex:build` |
 | Just copy the built jar into `./tools` | `npm run tlatex:install` |
 | Typeset spec(s) from the CLI (no VS Code) | `bash scripts/tlatex-dev.sh typeset path/to/Spec.tla [...]` |
+| Release jar vs built jar: `.tex` must be identical for the specs in `tests/tlatex-regress.txt` | `npm run tlatex:regress` (or `bash scripts/tlatex-dev.sh regress 20` for the first 20) |
+| Regenerate the golden `.tex` files after an *intended* output change | `npm run tlatex:golden` |
 | Full verification before pushing (what CI runs) | `npm run tlatex:check` |
 | Restore the released jar | `npm run tlatex:restore` |
 
@@ -97,18 +99,61 @@ After `npm run tlatex:dev`:
 
 ## Tests
 
-The `tlatex:test` target runs, by default, JUnit tests matching `tla2tex/*`:
+The `tlatex:test` target runs, by default, the JUnit tests matching `tla2tex/*`:
 
 ```sh
 npm run tlatex:test                 # all tla2tex tests
-bash scripts/tlatex-dev.sh test "tla2tex/MySpecificTest*"
+bash scripts/tlatex-dev.sh test "tla2tex/TokenizeSpecTest*"
 ```
 
-**Heads-up:** upstream `tlaplus/tlaplus` currently has **no** JUnit tests under
-`test/tla2tex/`. Part of the overhaul is adding them there (in your fork). The
-target above is already wired, so tests run as soon as you add them. Tests are
-compiled with `ant … compile compile-test` and executed via the `test-set`
-Ant target — the same mechanism the upstream `tlc2`/`tla2sany` suites use.
+Tests live in the fork under `tlatools/org.lamport.tlatools/test/tla2tex/`
+(upstream has none there); their input specs and golden files live in
+`tlatools/org.lamport.tlatools/test-model/tla2tex/`. They are compiled with
+`ant … compile compile-test` (note: `-Werror`) and run through the `test-set`
+Ant target, one JVM per test class, like the upstream `tlc2`/`tla2sany` suites.
+
+| Class | What it covers |
+| --- | --- |
+| `TLA2TexTestSupport` | Helpers: `resetStatics()`, `tokenize()`, `analyze()`, `latexWithoutAlignment()`, `runCli()` |
+| `TokenizeSpecTest` | Token shapes the overhaul depends on (keywords vs identifiers, `WF_` split, primes, parens) |
+| `CommentFormattingTest` | English prose vs TLA tokens in comments; isolation between specs |
+| `GoldenLaTeXTest` | For each `test-model/tla2tex/NAME.tla`, the LaTeX body must equal `NAME.golden.tex` |
+| `TypesetWithLaTeXTest` | Runs the real CLI with `pdflatex` on every test spec; skipped if `pdflatex` is absent |
+
+### Writing a test
+
+TLATeX keeps all state in static fields and normally runs once per JVM, so:
+
+- Call `TLA2TexTestSupport.resetStatics()` in `@Before`. It restores every
+  `Parameters` option to its default and resets the tokenizer tables and the
+  comment tokenizer's quote state (`TokenizeSpec.reset()`,
+  `TokenizeComment.reset()`), which otherwise leak from one spec to the next.
+- Use `latexWithoutAlignment(specText, dir)` for output tests. It runs the
+  whole pipeline except the two LaTeX runs, so every alignment space is zero
+  and no TeX installation is needed. `documentBody()` strips the inlined
+  `tlatex.sty` preamble.
+- Put new input specs in `test-model/tla2tex/`; `GoldenLaTeXTest` picks them
+  up automatically. Generate the golden with `npm run tlatex:golden`, read the
+  diff, and commit both files.
+- Only tests that genuinely need LaTeX should run it; guard them with
+  `Assume.assumeTrue(TLA2TexTestSupport.isOnPath("pdflatex"))`.
+
+### Golden files
+
+A golden file is a snapshot of current behaviour, so a diff in one is either
+a regression or an intended change. For an intended change run
+`npm run tlatex:golden`, review `git -C tlaplus diff` on the `.golden.tex`
+files, and commit them with the Java change.
+
+### Release-vs-built regression
+
+`npm run tlatex:regress` typesets every spec listed in
+[tests/tlatex-regress.txt](../tests/tlatex-regress.txt) (210 upstream
+`test-model` specs) twice, with the committed release `tools/tla2tools.jar`
+and with the freshly built jar, and requires the generated `.tex` to be
+byte-identical. The overhaul's features are opt-in, so a spec that uses none
+of them must typeset exactly as before. It needs `pdflatex` and takes a few
+minutes; `bash scripts/tlatex-dev.sh regress 20` runs only the first 20 specs.
 
 ## Sample specs for operator parsing
 
@@ -140,10 +185,12 @@ Bypass a single commit with `git commit --no-verify`.
 ## CI
 
 [.github/workflows/tlatex.yml](../.github/workflows/tlatex.yml) runs on every
-PR and push that touches the submodule pointer, the dev script, or the
-fixtures. It checks out the submodule, builds the jar with JDK 17, runs the
-`test/tla2tex/*` JUnit tests, typesets every fixture, and uploads the jar and
-the typeset output as artifacts. Because the checkout uses `submodules: true`,
+PR and push that touches the submodule pointer, the dev script, the fixtures,
+or the regression list. It checks out the submodule, builds the jar with JDK
+17, runs the `test/tla2tex/*` JUnit tests, typesets every fixture (failing on
+any LaTeX error in the `.log`, which `tla2tex` itself ignores), runs the
+release-vs-built regression, and uploads the jar and the typeset output as
+artifacts. Because the checkout uses `submodules: true`,
 a pointer to an unpushed fork commit fails the job. Run `npm run tlatex:check`
 locally to get the same result before pushing. The pre-existing `CI` and
 `Release` workflows are untouched; they test the extension against the
@@ -187,6 +234,21 @@ language server imports them through Maven and rewrites them, which dirties the
 submodule. [.vscode/settings.json](../.vscode/settings.json) prevents this: it
 disables Maven import, so `org.lamport.tlatools` is imported from its own
 `.classpath`, and it excludes the Toolbox and other projects.
+
+It also sets `java.autobuild.enabled` to `false`. The upstream `.classpath`
+sends compiler output to `class/`, the same directory the Ant build uses, and
+it does not list JUnit. With auto-build on, the language server compiles the
+test sources into `class/` without JUnit resolved, and those broken copies
+shadow Ant's `test-class` output (symptoms: `@RunWith` ignored,
+`NoClassDefFoundError` for JUnit classes). Build with `npm run tlatex:build`
+instead; use **Java: Force Java Compilation** only when you need the IDE's own
+compile. The Ant `test-set` classpath in the fork also lists `test-class`
+before `class` as a second line of defence.
+
+The dev script never calls the Ant `info` target: it depends on a jgit
+build-number task that walks the full commit history and fails on the shallow
+submodule clone. The script passes the `git.*` manifest properties from plain
+git instead.
 
 `npm run tlatex:setup` also adds a per-clone entry to the submodule's
 `.git/info/exclude` for the encoding prefs file the language server drops into

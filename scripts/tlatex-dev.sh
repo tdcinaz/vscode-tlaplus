@@ -20,8 +20,10 @@
 #   scripts/tlatex-dev.sh test [glob]         Run tla2tex JUnit tests (default tla2tex/*)
 #   scripts/tlatex-dev.sh install             Copy built jar into ./tools (+ ./out/tools)
 #   scripts/tlatex-dev.sh dev                 build + install (fast inner loop)
-#   scripts/tlatex-dev.sh typeset <File.tla>...  Typeset spec(s) with the built jar
-#   scripts/tlatex-dev.sh check               build + test + typeset all fixtures (what CI runs)
+#   scripts/tlatex-dev.sh typeset <File.tla>...  Typeset spec(s) with the built jar; fails on LaTeX errors
+#   scripts/tlatex-dev.sh golden              Regenerate the JUnit golden .tex files (review the diff!)
+#   scripts/tlatex-dev.sh regress [N]         Release jar vs built jar: .tex must be identical for tests/tlatex-regress.txt
+#   scripts/tlatex-dev.sh check               build + test + typeset fixtures + regress (what CI runs; TLATEX_SKIP_REGRESS=1 skips regress)
 #   scripts/tlatex-dev.sh restore             Restore the release jar (git checkout)
 #
 set -euo pipefail
@@ -141,12 +143,27 @@ ensure_source() {
     [[ -d "${BUILD_DIR}" ]] || cmd_setup
 }
 
+# Run Ant in the tlatools project. Never call the 'info' target: it depends on
+# 'git-revision', a jgit build-number task that walks the whole commit history
+# and fails on the shallow submodule clone ("MissingObjectException"). The only
+# thing it provides is the git.* properties for the jar manifest, so supply
+# those from plain git instead.
+ant_tools() {
+    local rev short branch
+    rev="$(git -C "${SUBMODULE_DIR}" rev-parse HEAD)"
+    short="$(git -C "${SUBMODULE_DIR}" rev-parse --short HEAD)"
+    branch="$(git -C "${SUBMODULE_DIR}" branch --show-current)"
+    ( cd "${BUILD_DIR}" && ant -f customBuild.xml \
+        -Dgit.revision="${rev}" -Dgit.shortRevision="${short}" \
+        -Dgit.branch="${branch:-detached}" -Dgit.tag="" "$@" )
+}
+
 cmd_build() {
     require ant
     require javac
     ensure_source
     log "Building tla2tools.jar (compile + compile-test + dist)"
-    ( cd "${BUILD_DIR}" && ant -f customBuild.xml info compile compile-test dist )
+    ant_tools compile compile-test dist
     [[ -f "${BUILT_JAR}" ]] || die "Build finished but ${BUILT_JAR} is missing."
     log "Built: ${BUILT_JAR}"
 }
@@ -156,12 +173,20 @@ cmd_test() {
     ensure_source
     local glob="${1:-tla2tex/*}"
     log "Running JUnit tests matching: ${glob}"
-    if ! ls "${BUILD_DIR}/test/${glob}" >/dev/null 2>&1; then
-        warn "No test files match test/${glob} yet."
-        warn "TLATeX has no upstream JUnit tests — add them under test/tla2tex/ in your fork,"
-        warn "then re-run. This target is wired and ready for them."
-    fi
-    ( cd "${BUILD_DIR}" && ant -f customBuild.xml compile compile-test test-set -Dtest.testcases="${glob}" )
+    # Ant's batchtest silently runs nothing when the glob matches no files;
+    # an empty suite must not look like a green one.
+    ls "${BUILD_DIR}"/test/${glob} >/dev/null 2>&1 \
+        || die "No test files match test/${glob} (tests live in tlaplus/tlatools/org.lamport.tlatools/test/tla2tex/)."
+    ant_tools compile compile-test test-set -Dtest.testcases="${glob}"
+}
+
+# Rewrite the golden .tex files used by test/tla2tex/GoldenLaTeXTest.java.
+# Only do this for an intended output change, and review the resulting diff in
+# tlaplus/ before committing it.
+cmd_golden() {
+    TLA2TEX_UPDATE_GOLDEN=1 cmd_test "tla2tex/GoldenLaTeXTest*"
+    log "Golden files updated under ${TOOLS_SUBDIR}/test-model/tla2tex/. Changed:"
+    git -C "${SUBMODULE_DIR}" status --short -- "${TOOLS_SUBDIR}/test-model/tla2tex" | sed 's/^/    /'
 }
 
 cmd_install() {
@@ -190,13 +215,88 @@ cmd_typeset() {
     local spec
     for spec in "$@"; do
         [[ -f "${spec}" ]] || die "Spec not found: ${spec}"
+        [[ "${spec}" == *.tla ]] || die "Expected a .tla file: ${spec}"
         log "Typesetting ${spec} with ${jar#${REPO_ROOT}/}"
-        # Mirrors the extension's default 'Export to PDF' invocation (see src/tla2tools.ts).
-        ( cd "$(dirname "${spec}")" \
-            && java -cp "${jar}" tla2tex.TLA -latexCommand pdflatex -nops -shade -grayLevel 0.85 "$(basename "${spec}")" ) \
+        typeset_one "${jar}" "$(dirname "${spec}")" "$(basename "${spec}")" \
             || die "Typesetting failed for ${spec}"
+        check_latex_output "${spec%.tla}"
     done
-    log "Output written next to the spec(s) (.tex/.dvi/.pdf)."
+    log "Output written next to the spec(s) (.tex/.pdf/.log)."
+}
+
+# Run tla2tex.TLA on one spec inside its directory, with the same flags the
+# extension's 'Export module to PDF' uses (see buildTexOptions in src/tla2tools.ts).
+typeset_one() {
+    local jar="$1" dir="$2" file="$3"
+    ( cd "${dir}" && java -cp "${jar}" tla2tex.TLA -latexCommand pdflatex -nops -shade -grayLevel 0.85 "${file}" )
+}
+
+# tla2tex runs LaTeX in \batchmode and treats only a negative exit code as a
+# failure, so a LaTeX error leaves tla2tex's exit code at 0. The .log is the
+# only evidence; an error line there starts with '!'.
+check_latex_output() {
+    local root="$1" errors overfull
+    [[ -f "${root}.log" ]] || die "LaTeX log ${root}.log not found; LaTeX did not run."
+    errors="$(grep -c '^!' "${root}.log" || true)"
+    if [[ "${errors}" != "0" ]]; then
+        grep -n -A2 '^!' "${root}.log" | head -30 >&2
+        die "LaTeX reported ${errors} error(s) while typesetting ${root}.tex (see ${root}.log)."
+    fi
+    overfull="$(grep -c '^Overfull' "${root}.log" || true)"
+    [[ "${overfull}" == "0" ]] || warn "${overfull} overfull box(es) in ${root}.log"
+    [[ -f "${root}.pdf" ]] || die "Expected ${root}.pdf was not produced."
+}
+
+# Regression guard: typeset the specs listed in tests/tlatex-regress.txt with
+# the committed release jar and with the freshly built jar, and require the
+# generated .tex files to be byte-identical. Phase 1 features are opt-in, so a
+# spec that uses none of them must typeset exactly as before.
+REGRESS_LIST="${REPO_ROOT}/tests/tlatex-regress.txt"
+cmd_regress() {
+    require java
+    require pdflatex
+    require git
+    [[ -f "${BUILT_JAR}" ]] || die "No built jar found. Run: scripts/tlatex-dev.sh build"
+    [[ -f "${REGRESS_LIST}" ]] || die "Missing ${REGRESS_LIST}"
+    local limit="${1:-0}"
+    local work; work="$(mktemp -d "${TMPDIR:-/tmp}/tlatex-regress.XXXXXX")"
+    local baseline="${work}/baseline.jar"
+    git -C "${REPO_ROOT}" show HEAD:tools/tla2tools.jar > "${baseline}" 2>/dev/null \
+        || die "Could not extract the committed release jar (git show HEAD:tools/tla2tools.jar)."
+    local model="${BUILD_DIR}/test-model"
+    local -a specs
+    mapfile -t specs < <(grep -v '^[[:space:]]*#' "${REGRESS_LIST}" | grep -v '^[[:space:]]*$')
+    if [[ "${limit}" -gt 0 && "${limit}" -lt "${#specs[@]}" ]]; then
+        specs=( "${specs[@]:0:${limit}}" )
+    fi
+    log "Regression: ${#specs[@]} spec(s), committed release jar vs ${BUILT_JAR#${REPO_ROOT}/}"
+    local failed=0 name root
+    for name in "${specs[@]}"; do
+        root="${name%.tla}"
+        if [[ ! -f "${model}/${name}" ]]; then
+            warn "  missing: ${model}/${name}"; failed=$((failed + 1)); continue
+        fi
+        mkdir -p "${work}/base/${root}" "${work}/new/${root}"
+        cp "${model}/${name}" "${work}/base/${root}/"
+        cp "${model}/${name}" "${work}/new/${root}/"
+        if ! typeset_one "${baseline}" "${work}/base/${root}" "${name}" > "${work}/base/${root}/tla2tex.out" 2>&1; then
+            warn "  release jar failed on ${name} (see ${work}/base/${root}/tla2tex.out)"; failed=$((failed + 1)); continue
+        fi
+        if ! typeset_one "${BUILT_JAR}" "${work}/new/${root}" "${name}" > "${work}/new/${root}/tla2tex.out" 2>&1; then
+            warn "  built jar failed on ${name} (see ${work}/new/${root}/tla2tex.out)"; failed=$((failed + 1)); continue
+        fi
+        if ! cmp -s "${work}/base/${root}/${root}.tex" "${work}/new/${root}/${root}.tex"; then
+            warn "  DIFF: ${name}"
+            diff -u "${work}/base/${root}/${root}.tex" "${work}/new/${root}/${root}.tex" | head -40 >&2 || true
+            failed=$((failed + 1))
+        fi
+    done
+    if [[ "${failed}" -eq 0 ]]; then
+        rm -rf "${work}"
+        log "regress passed: ${#specs[@]} spec(s) produce identical .tex with both jars."
+    else
+        die "regress: ${failed} of ${#specs[@]} spec(s) differ or failed. Outputs kept in ${work}"
+    fi
 }
 
 # One-shot verification used by CI (.github/workflows/tlatex.yml) and before
@@ -208,7 +308,12 @@ cmd_check() {
     local fixtures=( "${REPO_ROOT}"/tests/fixtures/tlatex/*.tla )
     [[ -f "${fixtures[0]}" ]] || die "No fixtures found under tests/fixtures/tlatex/"
     TARGET_JAR="${BUILT_JAR}" cmd_typeset "${fixtures[@]}"
-    log "check passed: build, tests, and ${#fixtures[@]} fixture(s) typeset."
+    if [[ -n "${TLATEX_SKIP_REGRESS:-}" ]]; then
+        warn "TLATEX_SKIP_REGRESS set; skipping the release-vs-built regression."
+    else
+        cmd_regress
+    fi
+    log "check passed: build, tests, ${#fixtures[@]} fixture(s) typeset, regression."
 }
 
 cmd_restore() {
@@ -235,6 +340,8 @@ main() {
         install) cmd_install "$@" ;;
         dev)     cmd_dev "$@" ;;
         typeset) cmd_typeset "$@" ;;
+        golden)  cmd_golden "$@" ;;
+        regress) cmd_regress "$@" ;;
         check)   cmd_check "$@" ;;
         restore) cmd_restore "$@" ;;
         -h|--help|help) usage ;;

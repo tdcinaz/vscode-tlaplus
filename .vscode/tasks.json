@@ -32,9 +32,16 @@
             "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
-            "label": "tlatex: check (build + test + fixtures)",
+            "label": "tlatex: check (build + test + fixtures + regress)",
             "type": "shell",
             "command": "bash scripts/tlatex-dev.sh check",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "tlatex: regress (release jar vs built jar)",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh regress",
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "dedicated" }
         },

@@ -836,6 +836,8 @@
         "tlatex:dev": "bash scripts/tlatex-dev.sh dev",
         "tlatex:restore": "bash scripts/tlatex-dev.sh restore",
         "tlatex:status": "bash scripts/tlatex-dev.sh status",
+        "tlatex:golden": "bash scripts/tlatex-dev.sh golden",
+        "tlatex:regress": "bash scripts/tlatex-dev.sh regress",
         "tlatex:check": "bash scripts/tlatex-dev.sh check"
     },
     "devDependencies": {
