@@ -128,6 +128,23 @@ bump as in step 2.
 > `npm run tlatex:setup` afterwards (or `git -C tlaplus switch tlatex-overhaul`)
 > before you commit inside `tlaplus/`.
 
+## Java IDE support (Extension Pack for Java)
+
+Upstream commits Eclipse `.project`/`.settings` files. By default the Java
+language server imports them through Maven and rewrites them, which dirties the
+submodule. [.vscode/settings.json](../.vscode/settings.json) prevents this: it
+disables Maven import, so `org.lamport.tlatools` is imported from its own
+`.classpath`, and it excludes the Toolbox and other projects.
+
+If the submodule shows modified `.project` files or new `.settings/*.prefs`
+anyway, they are generated, so discard them and reset the language server:
+
+```sh
+git -C tlaplus checkout -- . && git -C tlaplus clean -n   # review, then clean -f
+```
+
+Then run **Java: Clean Java Language Server Workspace** in VS Code.
+
 ## Syncing with upstream tlaplus
 
 ```sh

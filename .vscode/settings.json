@@ -3,5 +3,20 @@
     "search.exclude": {
         "**/node_modules": true,
         "out/": true
-	}
+	},
+    // Java (tlaplus submodule): keep the Java language server from rewriting
+    // the Eclipse .project/.settings files that upstream tlaplus commits.
+    // org.lamport.tlatools ships a complete .classpath, so import it as a plain
+    // Eclipse project instead of via Maven (m2e), and skip the other projects.
+    "java.import.maven.enabled": false,
+    "java.project.resourceFilters": [],
+    "java.import.exclusions": [
+        "**/node_modules/**",
+        "**/.metadata/**",
+        "**/archetype-resources/**",
+        "**/META-INF/maven/**",
+        "**/tlaplus/general/**",
+        "**/tlaplus/toolbox/**",
+        "**/tlaplus/tlatools/org.lamport.tlatools.*/**"
+    ]
 }
