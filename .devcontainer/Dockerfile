@@ -1,14 +1,16 @@
 FROM registry.hub.docker.com/pandoc/latex:3-ubuntu AS latex
 
-FROM mcr.microsoft.com/devcontainers/typescript-node:18-bookworm
+# Node 22 matches CI (.github/workflows/ci.yml) and @types/node.
+FROM mcr.microsoft.com/devcontainers/typescript-node:22-bookworm
 
 RUN apt update \
     && export DEBIAN_FRONTEND=noninteractive \
     # For running integration tests in the terminal
     && apt install -y libgtk-3-dev xvfb \
     # For running tlaplus tools in the debug window, and for building
-    # tla2tools.jar from source (TLATeX overhaul): JDK (compiler) + Ant.
-    && apt install -y openjdk-17-jdk ant \
+    # tla2tools.jar from source (TLATeX overhaul): JDK 17 (matches upstream
+    # tlaplus CI) + Ant with the optional tasks (junit) customBuild.xml needs.
+    && apt install -y openjdk-17-jdk ant ant-optional \
     && rm -rf /var/lib/apt/lists/*
 
 # Add minimal latex installation for tlaplus tools

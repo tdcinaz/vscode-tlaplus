@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Pre-commit guard for the extension repo (two-repo TLATeX workflow).
+# Installed by `npm run tlatex:setup` via `git config core.hooksPath .githooks`.
+# Bypass a single commit with `git commit --no-verify`.
+set -euo pipefail
+
+fail=0
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+# 1. The dev jar produced by `npm run tlatex:dev` must never be committed.
+if grep -qx 'tools/tla2tools.jar' <<<"${staged}" && [[ -z "${ALLOW_JAR_COMMIT:-}" ]]; then
+    cat >&2 <<'MSG'
+pre-commit: tools/tla2tools.jar is staged. That is normally a local dev build.
+            Fix:  npm run tlatex:restore && git reset -- tools/tla2tools.jar
+            If this really is a release jar, re-run with ALLOW_JAR_COMMIT=1.
+MSG
+    fail=1
+fi
+
+# 2. A submodule pointer bump must reference a commit already on the fork's branch.
+if grep -qx 'tlaplus' <<<"${staged}"; then
+    branch="$(git config -f .gitmodules submodule.tlaplus.branch)"
+    sha="$(git ls-files -s -- tlaplus | awk '{print $2}')"
+    if git -C tlaplus rev-parse -q --verify "refs/remotes/origin/${branch}" >/dev/null 2>&1; then
+        if ! git -C tlaplus merge-base --is-ancestor "${sha}" "refs/remotes/origin/${branch}" 2>/dev/null; then
+            cat >&2 <<MSG
+pre-commit: the staged tlaplus submodule commit ${sha:0:12} is not on origin/${branch}.
+            Teammates' 'git submodule update' would fail. Push the fork first:
+                git -C tlaplus push origin ${branch}
+MSG
+            fail=1
+        fi
+    else
+        echo "pre-commit: warning: origin/${branch} unknown in tlaplus; run 'npm run tlatex:setup'." >&2
+    fi
+fi
+
+exit "${fail}"

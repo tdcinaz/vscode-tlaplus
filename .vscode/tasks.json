@@ -15,6 +15,42 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "tlatex: dev (rebuild jar + install)",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh dev",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "tlatex: test",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh test",
+            "group": { "kind": "test", "isDefault": true },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "tlatex: check (build + test + fixtures)",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh check",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "tlatex: typeset current file",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh typeset \"${file}\"",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "tlatex: status",
+            "type": "shell",
+            "command": "bash scripts/tlatex-dev.sh status",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         }
     ]
 }

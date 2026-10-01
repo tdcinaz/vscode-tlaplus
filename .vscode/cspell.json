@@ -8,6 +8,11 @@
         "opam",
         "pdflatex",
         "checkndebug",
-        "evaluatable"
+        "evaluatable",
+        "tlatex",
+        "tla2tex",
+        "tla2tools",
+        "devcontainer",
+        "tlatools"
     ]
 }

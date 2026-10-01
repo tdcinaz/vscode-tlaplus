@@ -14,3 +14,6 @@ tests/fixtures/tlatex/*.pdf
 tests/fixtures/tlatex/*.log
 tests/fixtures/tlatex/*.aux
 tests/fixtures/tlatex/tlatex.*
+
+# Personal Claude Code overrides (shared team settings would live in .claude/settings.json)
+.claude/settings.local.json

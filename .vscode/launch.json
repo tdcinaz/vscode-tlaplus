@@ -30,6 +30,17 @@
             "preLaunchTask": "npm: pretest"
         },
         {
+            // Step through the typesetter itself. Requires the Java extension pack
+            // (recommended) and a built tlatools project (npm run tlatex:build).
+            "name": "Debug tla2tex.TLA on current .tla file",
+            "type": "java",
+            "request": "launch",
+            "mainClass": "tla2tex.TLA",
+            "projectName": "tlatools",
+            "cwd": "${fileDirname}",
+            "args": ["-latexCommand", "pdflatex", "-nops", "-shade", "-grayLevel", "0.85", "${fileBasename}"]
+        },
+        {
             "name": "Run TLA Plus Grammar Tests",
             "type": "node",
             "request": "launch",

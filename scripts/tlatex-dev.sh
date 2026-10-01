@@ -14,12 +14,14 @@
 #
 # Usage:
 #   scripts/tlatex-dev.sh doctor              Check prerequisites (JDK, Ant, git)
-#   scripts/tlatex-dev.sh setup               Init the ./tlaplus submodule at the pinned commit
+#   scripts/tlatex-dev.sh setup               Init the ./tlaplus submodule at the pinned commit, install git hooks
+#   scripts/tlatex-dev.sh status              Show branch/commit/dirty state of both repos and the dev jar
 #   scripts/tlatex-dev.sh build               Compile + package dist/tla2tools.jar
 #   scripts/tlatex-dev.sh test [glob]         Run tla2tex JUnit tests (default tla2tex/*)
 #   scripts/tlatex-dev.sh install             Copy built jar into ./tools (+ ./out/tools)
 #   scripts/tlatex-dev.sh dev                 build + install (fast inner loop)
-#   scripts/tlatex-dev.sh typeset <File.tla>  Typeset a spec with the built jar
+#   scripts/tlatex-dev.sh typeset <File.tla>...  Typeset spec(s) with the built jar
+#   scripts/tlatex-dev.sh check               build + test + typeset all fixtures (what CI runs)
 #   scripts/tlatex-dev.sh restore             Restore the release jar (git checkout)
 #
 set -euo pipefail
@@ -83,7 +85,41 @@ cmd_setup() {
         git -C "${SUBMODULE_DIR}" branch -q --set-upstream-to="origin/${branch}" 2>/dev/null || true
     fi
     [[ -d "${BUILD_DIR}" ]] || die "Expected ${TOOLS_SUBDIR} not found in the ${SUBMODULE_DIR} submodule."
+    install_hooks
     log "Source ready at ${BUILD_DIR} (branch: $(git -C "${SUBMODULE_DIR}" branch --show-current))"
+}
+
+# Guard hooks (see .githooks/): block committing the dev jar, an unpushed
+# submodule pointer, Eclipse metadata, or from a detached HEAD in the fork.
+install_hooks() {
+    git config core.hooksPath .githooks
+    git -C "${SUBMODULE_DIR}" config core.hooksPath "${REPO_ROOT}/.githooks/${SUBMODULE_DIR}"
+    log "Git hooks installed (core.hooksPath) in both repos"
+}
+
+cmd_status() {
+    require git
+    local branch sha detached
+    branch="$(git config -f .gitmodules "submodule.${SUBMODULE_DIR}.branch")"
+    log "Extension repo: $(git branch --show-current) @ $(git rev-parse --short HEAD)"
+    if git diff --quiet -- "tools/$(basename "${TARGET_JAR}")"; then
+        log "  tools/tla2tools.jar: release jar (unmodified)"
+    else
+        warn "  tools/tla2tools.jar: MODIFIED (local dev build installed; 'tlatex:restore' before committing)"
+    fi
+    [[ -d "${BUILD_DIR}" ]] || { warn "  ${SUBMODULE_DIR}: not initialized (run setup)"; return 0; }
+    sha="$(git -C "${SUBMODULE_DIR}" rev-parse --short HEAD)"
+    detached=""; git -C "${SUBMODULE_DIR}" symbolic-ref -q HEAD >/dev/null || detached=" (DETACHED HEAD, run setup before committing)"
+    log "${SUBMODULE_DIR}: $(git -C "${SUBMODULE_DIR}" branch --show-current) @ ${sha}${detached}"
+    local pinned; pinned="$(git ls-files -s -- "${SUBMODULE_DIR}" | awk '{print substr($2,1,7)}')"
+    [[ "${pinned}" == "${sha}" ]] && log "  pinned by extension repo: yes" || warn "  pinned by extension repo: no (pinned ${pinned}; 'git add ${SUBMODULE_DIR}' to bump)"
+    if git -C "${SUBMODULE_DIR}" rev-parse -q --verify "refs/remotes/origin/${branch}" >/dev/null 2>&1; then
+        git -C "${SUBMODULE_DIR}" merge-base --is-ancestor HEAD "refs/remotes/origin/${branch}" \
+            && log "  pushed to origin/${branch}: yes" || warn "  pushed to origin/${branch}: NO (push the fork before bumping the pointer)"
+    fi
+    local dirty; dirty="$(git -C "${SUBMODULE_DIR}" status --porcelain | wc -l | tr -d ' ')"
+    [[ "${dirty}" == "0" ]] && log "  working tree: clean" || warn "  working tree: ${dirty} changed file(s)"
+    [[ -f "${BUILT_JAR}" ]] && log "  built jar: $(date -r "${BUILT_JAR}" '+%Y-%m-%d %H:%M') ${BUILT_JAR#${REPO_ROOT}/}" || log "  built jar: none (run build)"
 }
 
 ensure_source() {
@@ -131,18 +167,33 @@ cmd_dev() {
 }
 
 cmd_typeset() {
-    local spec="${1:-}"
-    [[ -n "${spec}" ]] || die "Usage: scripts/tlatex-dev.sh typeset <File.tla>"
-    [[ -f "${spec}" ]] || die "Spec not found: ${spec}"
+    [[ $# -ge 1 ]] || die "Usage: scripts/tlatex-dev.sh typeset <File.tla>..."
     require java
     local jar="${TARGET_JAR}"
     [[ -f "${jar}" ]] || jar="${BUILT_JAR}"
     [[ -f "${jar}" ]] || die "No tla2tools.jar available. Run: scripts/tlatex-dev.sh dev"
-    log "Typesetting ${spec} with ${jar}"
-    # Mirrors the extension's default 'Export to PDF' invocation (see src/tla2tools.ts).
-    ( cd "$(dirname "${spec}")" \
-        && java -cp "${jar}" tla2tex.TLA -latexCommand pdflatex -nops -shade -grayLevel 0.85 "$(basename "${spec}")" )
-    log "Output written next to ${spec} (.dvi/.pdf/.tex)."
+    local spec
+    for spec in "$@"; do
+        [[ -f "${spec}" ]] || die "Spec not found: ${spec}"
+        log "Typesetting ${spec} with ${jar#${REPO_ROOT}/}"
+        # Mirrors the extension's default 'Export to PDF' invocation (see src/tla2tools.ts).
+        ( cd "$(dirname "${spec}")" \
+            && java -cp "${jar}" tla2tex.TLA -latexCommand pdflatex -nops -shade -grayLevel 0.85 "$(basename "${spec}")" ) \
+            || die "Typesetting failed for ${spec}"
+    done
+    log "Output written next to the spec(s) (.tex/.dvi/.pdf)."
+}
+
+# One-shot verification used by CI (.github/workflows/tlatex.yml) and before
+# pushing: fresh build, tla2tex unit tests, and every fixture must typeset.
+cmd_check() {
+    require pdflatex
+    cmd_build
+    cmd_test
+    local fixtures=( "${REPO_ROOT}"/tests/fixtures/tlatex/*.tla )
+    [[ -f "${fixtures[0]}" ]] || die "No fixtures found under tests/fixtures/tlatex/"
+    TARGET_JAR="${BUILT_JAR}" cmd_typeset "${fixtures[@]}"
+    log "check passed: build, tests, and ${#fixtures[@]} fixture(s) typeset."
 }
 
 cmd_restore() {
@@ -153,7 +204,8 @@ cmd_restore() {
 }
 
 usage() {
-    sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Print the header comment block (everything before 'set -euo pipefail').
+    sed -n '2,/^set -euo pipefail/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
 }
 
 main() {
@@ -162,11 +214,13 @@ main() {
     case "${cmd}" in
         doctor)  cmd_doctor "$@" ;;
         setup)   cmd_setup "$@" ;;
+        status)  cmd_status "$@" ;;
         build)   cmd_build "$@" ;;
         test)    cmd_test "$@" ;;
         install) cmd_install "$@" ;;
         dev)     cmd_dev "$@" ;;
         typeset) cmd_typeset "$@" ;;
+        check)   cmd_check "$@" ;;
         restore) cmd_restore "$@" ;;
         -h|--help|help) usage ;;
         *) die "Unknown command '${cmd}'. Run: scripts/tlatex-dev.sh --help" ;;

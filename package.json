@@ -834,7 +834,9 @@
         "tlatex:test": "bash scripts/tlatex-dev.sh test",
         "tlatex:install": "bash scripts/tlatex-dev.sh install",
         "tlatex:dev": "bash scripts/tlatex-dev.sh dev",
-        "tlatex:restore": "bash scripts/tlatex-dev.sh restore"
+        "tlatex:restore": "bash scripts/tlatex-dev.sh restore",
+        "tlatex:status": "bash scripts/tlatex-dev.sh status",
+        "tlatex:check": "bash scripts/tlatex-dev.sh check"
     },
     "devDependencies": {
         "@playwright/test": "^1.56.1",

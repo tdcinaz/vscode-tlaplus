@@ -1,5 +1,11 @@
 # TLA<sup>+</sup> for Visual Studio Code and Cursor
 
+> **This fork hosts the TLATeX overhaul.** The TLA+ → LaTeX/PDF typesetter
+> (`tla2tex`) is being modernized here; its Java source is the `tlaplus/`
+> submodule. Start with [CLAUDE.md](CLAUDE.md) for the short version and
+> [docs/TLATEX_DEV.md](docs/TLATEX_DEV.md) for the full workflow. Everything
+> below is the upstream extension README.
+
 [![Build Status](https://img.shields.io/github/actions/workflow/status/tlaplus/vscode-tlaplus/ci.yml?branch=master)](https://github.com/tlaplus/vscode-tlaplus/actions?query=workflow%3ARelease) [![VS Code extension version](https://img.shields.io/visual-studio-marketplace/i/tlaplus.vscode-ide?color=blue&label=Stable%20Release&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=tlaplus.vscode-ide)
 
 This extension adds support for the [TLA<sup>+</sup> formal specification language](http://research.microsoft.com/en-us/um/people/lamport/tla/tla.html) to VS Code. It also supports running the TLC model checker on TLA<sup>+</sup> specifications.

@@ -1,0 +1,65 @@
+# Builds tla2tools.jar from the tlaplus submodule (our fork, branch
+# tlatex-overhaul), runs the tla2tex JUnit tests, and typesets every fixture in
+# tests/fixtures/tlatex/. Mirrors `npm run tlatex:check`.
+#
+# `submodules: true` also enforces the "push the fork first" rule: a pointer to
+# a commit that is not on GitHub fails at checkout.
+name: TLATeX
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'tlaplus'
+      - '.gitmodules'
+      - 'scripts/tlatex-dev.sh'
+      - 'tests/fixtures/tlatex/**'
+      - '.github/workflows/tlatex.yml'
+  pull_request:
+    paths:
+      - 'tlaplus'
+      - '.gitmodules'
+      - 'scripts/tlatex-dev.sh'
+      - 'tests/fixtures/tlatex/**'
+      - '.github/workflows/tlatex.yml'
+  workflow_dispatch:
+
+jobs:
+  tlatex:
+    name: Build jar, run tla2tex tests, typeset fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      with:
+        submodules: true
+    - name: Set up JDK 17
+      uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+      with:
+        distribution: temurin
+        java-version: 17
+    - name: Install Ant and LaTeX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends ant ant-optional texlive-latex-base
+    - name: Doctor
+      run: bash scripts/tlatex-dev.sh doctor
+    - name: Build + test + typeset fixtures
+      run: bash scripts/tlatex-dev.sh check
+    - name: Upload built jar
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: tla2tools-dev.jar
+        path: tlaplus/tlatools/org.lamport.tlatools/dist/tla2tools.jar
+        if-no-files-found: ignore
+    - name: Upload typeset fixtures
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: tlatex-fixture-output
+        path: |
+          tests/fixtures/tlatex/*.pdf
+          tests/fixtures/tlatex/*.tex
+          tests/fixtures/tlatex/*.log
+        if-no-files-found: ignore

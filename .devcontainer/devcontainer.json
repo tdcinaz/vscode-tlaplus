@@ -1,13 +1,30 @@
 {
-    "name": "TLA+ VSCode",
+    "name": "TLA+ VSCode (TLATeX overhaul)",
+    "build": { "dockerfile": "Dockerfile" },
+    "features": {
+        // `gh` for PR/issue workflows from the terminal (humans and agents).
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        // Claude Code CLI, so agentic sessions run inside the same toolchain.
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+    },
     "customizations": {
         "vscode": {
-            "extensions": ["connor4312.esbuild-problem-matchers"]
+            "extensions": [
+                "connor4312.esbuild-problem-matchers",
+                "vscjava.vscode-java-pack",
+                "James-Yu.latex-workshop",
+                "anthropic.claude-code"
+            ]
         }
     },
-    "build": { "dockerfile": "Dockerfile" },
-    "postCreateCommand": "git submodule update --init --depth 1 && npm install",
+    // The submodule is initialised and the guard hooks are installed by
+    // tlatex:setup, so every teammate (and agent) starts from the same state.
+    "postCreateCommand": "npm install && npm run tlatex:setup",
     "mounts": [
-        // add folder with test tla+ files, e.g. {"source": "path/to/folder", "target": "/workspaces/folder", "type": "bind"}
-    ]
+        // Persist Claude Code auth/history across container rebuilds.
+        "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+        // Add folders with test TLA+ specs, e.g.
+        // {"source": "path/to/folder", "target": "/workspaces/folder", "type": "bind"}
+    ],
+    "remoteUser": "node"
 }
