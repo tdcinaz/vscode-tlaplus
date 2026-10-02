@@ -34,9 +34,12 @@ Inside `tlaplus/`, `origin` is our fork and `upstream` is `tlaplus/tlaplus`.
    container includes a **JDK 17**, **Ant**, **TeX Live**, **Node 22**, the
    **GitHub CLI**, **poppler-utils** (PDF to PNG/text), **ImageMagick**,
    **shellcheck**, and **Claude Code**, plus the recommended VS Code extensions
-   (Java pack, LaTeX Workshop, Claude Code). On create it runs
-   `npm install && npm run tlatex:setup`. This is the reproducible environment,
-   so every teammate and every agent session gets the same toolchain. The
+   (Java pack, LaTeX Workshop, Claude Code). On create it marks only the
+   mounted workspace as a Git safe directory, then runs
+   `npm install && npm run tlatex:setup`; this avoids Git's dubious-ownership
+   error without disabling that protection for other repositories. This is the
+   reproducible environment, so every teammate and every agent session gets the
+   same toolchain. The
    host's `~/.claude` directory is bind-mounted into the container, so Claude
    Code settings, memory, and history are shared and survive rebuilds.
 

@@ -17,9 +17,12 @@
             ]
         }
     },
+    // Bind-mounted workspaces can have a different owner than the container user.
+    // Trust only this workspace so Git can run tlatex:setup without disabling its
+    // dubious-ownership protection globally.
     // The submodule is initialised and the guard hooks are installed by
     // tlatex:setup, so every teammate (and agent) starts from the same state.
-    "postCreateCommand": "npm install && npm run tlatex:setup",
+    "postCreateCommand": "git config --global --add safe.directory \"$(pwd)\" && npm install && npm run tlatex:setup",
     // Ensure the host's ~/.claude exists before the bind mount below is created.
     // Without it the container fails to start for teammates who have not run
     // Claude Code yet (the bind source path would not exist). Runs on the host.
