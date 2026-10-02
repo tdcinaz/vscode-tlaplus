@@ -20,10 +20,15 @@
     // The submodule is initialised and the guard hooks are installed by
     // tlatex:setup, so every teammate (and agent) starts from the same state.
     "postCreateCommand": "npm install && npm run tlatex:setup",
+    // Ensure the host's ~/.claude exists before the bind mount below is created.
+    // Without it the container fails to start for teammates who have not run
+    // Claude Code yet (the bind source path would not exist). Runs on the host.
+    "initializeCommand": "mkdir -p ${localEnv:HOME}${localEnv:USERPROFILE}/.claude",
     "mounts": [
         // Share the host's ~/.claude (settings, memory, project history) with the
-        // container user. The directory must exist on the host; installing Claude
-        // Code creates it. HOME/USERPROFILE covers macOS/Linux and Windows hosts.
+        // container user. initializeCommand above guarantees the directory exists
+        // on the host (installing Claude Code also creates it).
+        // HOME/USERPROFILE covers macOS/Linux and Windows hosts.
         // Note: on macOS the host login lives in the Keychain, not here, so to
         // avoid a separate container sign-in, seed the token the container reads
         // from the Keychain once (re-run if you log in again on the host):
