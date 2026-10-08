@@ -1,6 +1,7 @@
 # TLATeX overhaul — Phase 1 proposal (source changes)
 
-*Status: proposal, 2026-10-01. Analysis of
+*Status: proposal, 2026-10-01; P1-4 revised 2026-10-08 to locate macro
+arguments with SANY's parse tree instead of parenthesis counting. Analysis of
 `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/` at fork commit `fbceae3`,
 which adds tests and two reset hooks but changes no typesetting behaviour.
 The build, test and regression infrastructure this plan relies on is in place;
@@ -12,7 +13,10 @@ and the commands in [TLATEX_DEV.md](TLATEX_DEV.md).*
 Phase 1 should deliver the author's "simpler possibility" from the README first
 (identifier → TeX symbol, `alpha` → `\alpha`), then the full operator → macro
 rewrite restricted to single-line applications, both driven by a small
-directive notation that lives in comments. Everything is opt-in, so a spec with
+directive notation that lives in comments. Macro arguments are located with
+SANY's syntax-only parse tree, which is already in `tla2tools.jar`, and then
+mapped back onto TLATeX's tokens, which remain the only thing that renders
+output. Everything is opt-in, so a spec with
 no directives typesets byte-for-byte as it does today, and the release-vs-built
 regression (`npm run tlatex:regress`) must stay empty throughout.
 
@@ -58,9 +62,25 @@ Facts that shape the design:
   depth and PlusCal brace depth). But the symbol table already classifies
   `( [ { <<` as `Symbol.LEFT_PAREN` and `) ] } >>` as `RIGHT_PAREN`
   ([BuiltInSymbols.java:277-285](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/BuiltInSymbols.java#L277)),
-  and `,` as `PUNCTUATION`, so argument capture can be a post-tokenization
-  pass over `Token[][]` rather than an FSM change. `TokenizeSpecTest`
-  already pins these token shapes.
+  and `,` as `PUNCTUATION`. Counting these is **not** enough to find
+  arguments, as a probe over real tokens showed: `]_` and `>>_` are
+  `SUBSCRIPTED`, not `RIGHT_PAREN` (lines 274-275), so `Op([][A]_v)` and
+  `Op(<<A>>_v)` never close; and the commas in `\A x, y : P` and
+  `LAMBDA u, v : e` sit at argument depth, so `Pair(\A x, y : P, TRUE)` splits
+  into three arguments. Parenthesis counting means re-implementing part of the
+  TLA+ grammar by hand, which is what the README calls "nontrivial".
+- **TLATeX does not use SANY, but SANY's parser is in the same jar.**
+  `tla2sany.parser.TLAplusParser(SanyOutput, byte[])` followed by `parse()` and
+  `rootNode()` gives the concrete syntax tree for one file without the semantic
+  phase, so it needs no module resolution (it parsed a probe with
+  `EXTENDS DoesNotExist`). Each `N_OpApplication` node has a `N_GeneralId`
+  head and an `N_OpArgs` child whose argument nodes carry begin/end line and
+  column; it located every argument in the probe correctly. Both lexers
+  expand tabs to 8-column stops, and SANY's 1-based `line:col` maps to
+  `Token[line-1]` with `column == col-1` (verified on the probe). TLATeX
+  itself still never checks syntax
+  ([info.txt](../tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/info.txt)
+  line 124), and SANY never sees PlusCal source or TLA+ inside comments.
 - **Subscript machinery exists.** `WF_x`, `]_v`, `^` already produce
   `_{...}` / `^{...}` via `Symbol.SUBSCRIPTED` and the per-token `subscript`
   flag; the macro rewrite does not need to invent this.
@@ -196,29 +216,60 @@ new golden spec; unit tests via `latexWithoutAlignment` for `alpha'`,
 
 ### P1-4 Operator application → TeX macro, single-line scope — medium
 
-Design:
+Design: SANY decides *where* applications and arguments are; TLATeX's tokens
+still decide *how* everything is printed. No SANY source is changed.
 
-1. **Find applications** in a pass over `Token[][]` run before
-   `FindAlignments`: an IDENT whose string is a macro name, immediately followed
-   by BUILTIN `(` on the same line. Walk forward on that line tracking depth
-   over `Symbol.LEFT_PAREN` / `RIGHT_PAREN` symbol types (this covers `(`, `[`,
-   `{`, `<<` and their closers, so set literals, tuples, and function
-   application inside arguments are handled). Top-level `,` tokens split the
-   arguments; the matching `)` ends the application. Record on the head token a
-   `MacroApplication{argRanges[]}`; mark interior tokens `hiddenByMacro`.
-2. **Decline when unsafe**: arity mismatch, the closing `)` is on another
-   line, or (checked after `FindAlignments`) any interior token has
-   `aboveAlign`/`belowAlign` set or `isAlignmentPoint`. Declined applications
-   render as today, and `-debug` says why. This keeps the alignment engine
+1. **Find applications** in a new class `MacroSpans`, run before
+   `FindAlignments`, and only if the module has at least one `macro` directive
+   (so specs without directives never invoke SANY). Its entry point takes the
+   source bytes, the `Token[][]` and the directive table, so tests need no
+   files; `TLA.runTranslation` passes the bytes of `Parameters.TLAInputFile`.
+   Run `new TLAplusParser(new SilentSanyOutput(), bytes).parse()` and walk
+   `rootNode()`. For each `N_OpApplication` whose head's last name component
+   (`Integral`, or `Integral` in `M!Integral`) matches a macro of the same arity,
+   take the argument nodes of `N_OpArgs` (skipping the `(`, `,`, `)` leaves).
+   Definitions are found the same way from `N_IdentLHS` (see item 4).
+2. **Map spans to tokens.** A SANY location `line:col` corresponds to
+   `Token[line-1]` with `column == col-1`. An argument's token range runs from
+   the token starting exactly at its begin column to the token covering its
+   end column. If any boundary falls between token starts, decline the
+   application; this guards against lexers that disagree on a token (for
+   example README bug 2, or a non-ASCII character decoded differently before
+   P1-5's UTF-8 fix). Record a `MacroApplication{argRanges[]}` on the head token and
+   mark interior tokens `hiddenByMacro`.
+3. **Fall back when SANY cannot parse.** TLATeX's contract is that it does not
+   check syntax, and that stays true: if `parse()` returns false or throws
+   (including `TokenMgrError`), no macros are applied, TLATeX prints one
+   warning naming the first SANY error, and output is what it would be without
+   macro directives. Symbol substitution (P1-3) does not depend on SANY and
+   still applies.
+4. **Definitions** (`Integral(f, lo, hi) == hi - lo`) are rewritten like any
+   other application; SANY distinguishes them (`N_IdentLHS` vs
+   `N_OpApplication`), so the `nodef` alternative in open question 3 is a
+   one-line switch. Higher-order parameters (`F(op(_, _)) == ...`) are
+   declarations, not applications, so they pass through.
+5. **Decline when unsafe**: arity mismatch, an application or argument
+   spanning more than one line, a boundary mismatch from item 2, or (checked
+   after `FindAlignments`) any interior token with `aboveAlign`/`belowAlign`
+   set or `isAlignmentPoint`. Declined applications render as today, and
+   `Parameters.Debug` (`-debug`) says why. This keeps the alignment engine
    untouched.
-3. **Render**: `TokenRenderer` emits the template with `#k` replaced by the
+6. **Render**: `TokenRenderer` emits the template with `#k` replaced by the
    rendered tokens of argument k (recursively, so `Frac(Abs(-5), Norm(7))`
    nests), then skips to after the `)`. Because both writers share the renderer,
    the alignment run measures the macro's real width.
-4. **Definitions** (`Integral(f, lo, hi) == hi - lo`) are rewritten like any
-   other application. See open question 3.
-5. Higher-order placeholders (`op(_, _)`) tokenize as IDENT `_` and are not
-   macro heads, so they pass through.
+
+Why not counting parentheses over `Token[][]`, as the README suggests: see §2.
+Fixing that approach requires treating `]_`/`>>_` as closers and suppressing
+commas between a binder (`\A`, `\E`, `\AA`, `\EE`, `LAMBDA`) and its `:`, and
+each later construct would need the same treatment. With SANY the grammar
+stays the parser's job, and phase 2 inherits exact spans for multi-line
+applications and user-defined infix/prefix operators.
+
+Why not rebuild TLATeX on SANY's tree: the tree does not keep the layout
+(alignment, comment placement) that TLATeX's line/column output depends on, and
+it never sees PlusCal source or TLA+ inside comments. So the tree is used only
+to find applications.
 
 Why single-line only: output is one `\@x{...}` per source line and alignment
 is computed per line. A macro spanning lines (`NestedArguments.tla`, `N3`)
@@ -226,12 +277,22 @@ would need either joining lines or emitting partial macros, which is the
 alignment-engine work deferred to phase 2. The fixtures already separate the
 single-line cases (`MacroOperators.tla`) from the multi-line ones.
 
-Tests: unit tests for the span finder over hand-built `Token[][]` (nested
-parens, set literal with commas, tuple, `seq[2]`, arity mismatch, unclosed
-paren at end of line, nested macro heads); a directive-bearing copy of
-`MacroOperators.tla` as a golden spec; `NestedArguments.tla` with directives
-must still typeset, with `N3` rendered the old way; `render`/`pdfdiff` to
-eyeball the first real PDFs; regression empty.
+Out of scope for phase 1: macros inside PlusCal algorithm text and inside
+TLA+ in comments (SANY sees both as comments, so they render as today). The
+TLA+ translation of a PlusCal algorithm is ordinary module text and is
+rewritten.
+
+Tests: unit tests for `MacroSpans` that parse small modules from strings
+(`TLAplusParser` accepts `byte[]`) and tokenize them with `VectorCharReader`,
+covering nested parens, a set literal with commas, a tuple, `f[2]`,
+`\A x, y : P` and `LAMBDA u, v : e` arguments, `[][A]_v` and `<<A>>_v`
+arguments, `M!Op(...)`, nested macro heads, arity mismatch, an argument
+continuing on the next line, a tab before the application, an unresolvable
+`EXTENDS`, and a module SANY rejects (no macros, one warning, same body as
+without directives); a directive-bearing copy of `MacroOperators.tla` as a
+golden spec; `NestedArguments.tla` with directives must still typeset, with
+`N3` rendered the old way; `render`/`pdfdiff` to eyeball the first real PDFs;
+regression empty.
 
 ### P1-5 Hygiene fixes — small, each with a test
 
@@ -266,7 +327,12 @@ leave `npm run tlatex:check` green.
 
 ## 6. Explicitly deferred to phase 2+
 
-- **Multi-line macro arguments** and any change to `FindAlignments`.
+- **Multi-line macro arguments** and any change to `FindAlignments`. SANY
+  already reports exact multi-line spans, so the remaining work is output and
+  alignment, not finding arguments.
+- **Macros in PlusCal source and in TLA+ inside comments**, plus user-defined
+  infix/prefix operators as macros (`N_InfixExpr` / `N_PrefixExpr` in the same
+  tree walk).
 - **Unicode TLA+ input** (`∧ ∨ ∈ ≜`): needs a code-point-based `CharReader`
   and tokenizer; upstream's PlusCal already moved to code points (2024).
 - **Collections/generics modernisation and `TeX.java` dedupe**: valuable but
@@ -284,6 +350,14 @@ leave `npm run tlatex:check` green.
 - **Upstream sync**: all phase 1 changes stay under `src/tla2tex`,
   `test/tla2tex`, `test-model/tla2tex`. The only upstream file the fork has
   touched is the `test-set` classpath order in `customBuild.xml`.
+- **Coupling to SANY's parse tree**: P1-4 reads `TLAplusParser` and the
+  `SyntaxTreeConstants` node kinds without changing them. An upstream grammar
+  change could alter tree shapes; the `MacroSpans` unit tests pin the shapes
+  used, and the boundary check in P1-4 item 2 makes a mismatch decline rather
+  than mis-render.
+- **Macros require a parseable spec**: a spec with a syntax error silently
+  loses its macros (with a warning) until it is fixed. Acceptable because
+  macros are opt-in and the extension already runs SANY on save.
 - **Directive syntax churn**: pick it once (open question 1); it becomes part
   of users' specs.
 - **Comment-side substitution** depends on the existing `isTLA` heuristics,
@@ -296,8 +370,12 @@ leave `npm run tlatex:check` green.
    `\* TLATeX: ...` (README wording) or a dedicated prolog block.
 2. **Directive lines suppressed from output** (proposed) vs typeset as comments.
 3. **Rewrite definitions too?** Proposed yes (`Integral(f, lo, hi) == ...`
-   becomes `\int_{lo}^{hi} f == ...`). Alternative: a `nodef` modifier.
+   becomes `\int_{lo}^{hi} f == ...`). Alternative: a `nodef` modifier, cheap
+   because SANY separates definitions from uses.
 4. **UTF-8 by default** for reading and writing. Correct for modern specs, but a
    behaviour change on Windows for non-ASCII comments encoded in cp1252.
 5. **Symbol substitution inside comments** on by default when the token is
    classified as TLA (proposed), or only with `-tlaComment`.
+6. **When SANY cannot parse the spec**: drop macros with a warning and
+   typeset anyway (proposed), or fail the run so the author notices. Falling
+   back keeps TLATeX's "does not check syntax" contract.
