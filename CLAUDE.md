@@ -23,6 +23,7 @@ and test-infrastructure findings behind it are in
 | Single entry point for build/test/typeset | `scripts/tlatex-dev.sh` (wrapped as `npm run tlatex:*`) |
 | Guard hooks (installed by `tlatex:setup`) | `.githooks/` |
 | CI for the Java side | `.github/workflows/tlatex.yml` |
+| Second repo tracking `tla2tex/`, `tests/fixtures/tlatex/`, `docs/` in place | `scripts/recon.sh` (`.git/recon.git`, remote `chris-ortiz-sndk/ReconTEXTualization`) |
 
 ## Commands (run from the repo root)
 
@@ -39,6 +40,8 @@ bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla   # 
 bash scripts/tlatex-dev.sh render tests/fixtures/tlatex/MacroOperators.tla     # PDF page -> PNG, to look at the result
 bash scripts/tlatex-dev.sh pdfdiff before.pdf after.pdf                       # pixel diff, highlights kept in a temp dir
 npm run tlatex:restore   # put the released jar back
+npm run recon -- init    # set up the ReconTEXTualization git dir (once per clone)
+git recon status         # any git command against ReconTEXTualization (add/commit/push/pull)
 ```
 
 Extension side (TypeScript): `npm run compile`, `npm run lint`, `npm test`

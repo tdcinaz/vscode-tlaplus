@@ -838,7 +838,8 @@
         "tlatex:status": "bash scripts/tlatex-dev.sh status",
         "tlatex:golden": "bash scripts/tlatex-dev.sh golden",
         "tlatex:regress": "bash scripts/tlatex-dev.sh regress",
-        "tlatex:check": "bash scripts/tlatex-dev.sh check"
+        "tlatex:check": "bash scripts/tlatex-dev.sh check",
+        "recon": "bash scripts/recon.sh"
     },
     "devDependencies": {
         "@playwright/test": "^1.56.1",
