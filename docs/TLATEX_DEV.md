@@ -324,8 +324,8 @@ npm run tlatex:check
 
 ## Second repo: ReconTEXTualization
 
-The TLATeX source, the sample specs, these docs, and the helper scripts are
-also tracked by the
+The TLATeX source, the sample specs, these docs, the helper scripts, and the
+shared deliverables are also tracked by the
 private repo
 [`chris-ortiz-sndk/ReconTEXTualization`](https://github.com/chris-ortiz-sndk/ReconTEXTualization),
 in place and with the same paths:
@@ -334,6 +334,7 @@ in place and with the same paths:
 - `tests/fixtures/tlatex/`
 - `docs/`
 - `scripts/`
+- `deliverables/`
 
 [scripts/recon.sh](../scripts/recon.sh) keeps a second git dir in
 `.git/recon.git` that uses this workspace as its work tree. Neither repo

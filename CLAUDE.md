@@ -23,7 +23,7 @@ and test-infrastructure findings behind it are in
 | Single entry point for build/test/typeset | `scripts/tlatex-dev.sh` (wrapped as `npm run tlatex:*`) |
 | Guard hooks (installed by `tlatex:setup`) | `.githooks/` |
 | CI for the Java side | `.github/workflows/tlatex.yml` |
-| Second repo tracking `tla2tex/`, `tests/fixtures/tlatex/`, `docs/`, `scripts/` in place | `scripts/recon.sh` (`.git/recon.git`, remote `chris-ortiz-sndk/ReconTEXTualization`) |
+| Second repo tracking `tla2tex/`, `tests/fixtures/tlatex/`, `docs/`, `scripts/`, `deliverables/` in place | `scripts/recon.sh` (`.git/recon.git`, remote `chris-ortiz-sndk/ReconTEXTualization`) |
 
 ## Commands (run from the repo root)
 
