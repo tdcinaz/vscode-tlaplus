@@ -324,7 +324,8 @@ npm run tlatex:check
 
 ## Second repo: ReconTEXTualization
 
-The TLATeX source, the sample specs, and these docs are also tracked by the
+The TLATeX source, the sample specs, these docs, and the helper scripts are
+also tracked by the
 private repo
 [`chris-ortiz-sndk/ReconTEXTualization`](https://github.com/chris-ortiz-sndk/ReconTEXTualization),
 in place and with the same paths:
@@ -332,10 +333,11 @@ in place and with the same paths:
 - `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/`
 - `tests/fixtures/tlatex/`
 - `docs/`
+- `scripts/`
 
 [scripts/recon.sh](../scripts/recon.sh) keeps a second git dir in
 `.git/recon.git` that uses this workspace as its work tree. Neither repo
-sees the other. Sparse checkout limits it to the three folders, so files that
+sees the other. Sparse checkout limits it to those folders, so files that
 repo has elsewhere (its `README.md`) never overwrite this workspace's files.
 Ignore rules come from the usual `.gitignore` files, so typeset output and build
 products stay untracked.
@@ -344,14 +346,14 @@ products stay untracked.
 npm run recon -- init        # once per clone (idempotent); needs read access to the repo
 git recon status             # any git command, run against the second repo
 git recon add -A && git recon commit -m "..." && git recon push
-git recon pull               # bring in teammates' changes (only the three folders are written)
+git recon pull               # bring in teammates' changes (only the tracked folders are written)
 ```
 
 Commits to the two repos (three, counting the `tlaplus` fork) are independent.
 Commit here as usual, then `git recon add`/`commit`/`push` whenever you want
 ReconTEXTualization to catch up. `git recon clean` and `git recon
 sparse-checkout` (except `list`) are blocked, because everything outside the
-three folders counts as ignored in the second repo. To change the tracked
+tracked folders counts as ignored in the second repo. To change the tracked
 folders, edit `TRACKED_DIRS` in the script and re-run `init`.
 
 ## Working with agents

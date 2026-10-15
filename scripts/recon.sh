@@ -9,6 +9,7 @@
 #   tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/   (inside the submodule)
 #   tests/fixtures/tlatex/
 #   docs/
+#   scripts/
 #
 # Sparse checkout limits the second repo to those folders: files it has outside
 # them (e.g. its own README.md) are never written into the workspace, and an
@@ -33,6 +34,7 @@ TRACKED_DIRS=(
     "tlaplus/tlatools/org.lamport.tlatools/src/tla2tex"
     "tests/fixtures/tlatex"
     "docs"
+    "scripts"
 )
 
 GIT_DIR_RECON="$(git -C "${REPO_ROOT}" rev-parse --path-format=absolute --git-common-dir)/recon.git"
@@ -111,7 +113,7 @@ cmd_init() {
 
     git -C "${REPO_ROOT}" config alias.recon "!bash \"${SCRIPT_DIR}/recon.sh\""
     log "Ready. Use 'git recon <git args>' or 'npm run recon -- <git args>'."
-    rgit status --short --branch
+    rgit status --short --branch -- "${TRACKED_DIRS[@]/#/:(top)}"
 }
 
 guard() {
