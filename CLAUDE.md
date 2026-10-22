@@ -91,3 +91,7 @@ The original author's own list of planned enhancements is in
 `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/README` ("POSSIBLE
 ENHANCEMENTS"). The first target is item 2: turning operator applications into
 TeX macros (and identifier-to-symbol substitution such as `alpha` to `\alpha`).
+Phase 1 implements it for single-line applications through `@tlatex:`
+directives (`Directives`, `MacroSpans`, `TokenRenderer`); user docs are in the
+last section of `src/tla2tex/info.txt`, and what differs from the plan is in
+§9 of the phase 1 proposal.

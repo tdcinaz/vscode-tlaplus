@@ -233,9 +233,11 @@ typeset_one() {
     ( cd "${dir}" && java -cp "${jar}" tla2tex.TLA -latexCommand pdflatex -nops -shade -grayLevel 0.85 "${file}" )
 }
 
-# tla2tex runs LaTeX in \batchmode and treats only a negative exit code as a
-# failure, so a LaTeX error leaves tla2tex's exit code at 0. The .log is the
-# only evidence; an error line there starts with '!'.
+# tla2tex runs LaTeX in \batchmode. Since phase 1 (P1-5) the built jar exits
+# non-zero when LaTeX reports an error, but the release jar treats only a
+# negative exit code as a failure, so its exit code stays 0. The .log is
+# checked either way; an error line there starts with '!'. It also reports
+# overfull boxes, which are not errors.
 check_latex_output() {
     local root="$1" errors overfull
     [[ -f "${root}.log" ]] || die "LaTeX log ${root}.log not found; LaTeX did not run."

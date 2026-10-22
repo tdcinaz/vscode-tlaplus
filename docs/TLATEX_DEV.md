@@ -120,20 +120,25 @@ Ant target, one JVM per test class, like the upstream `tlc2`/`tla2sany` suites.
 
 | Class | What it covers |
 | --- | --- |
-| `TLA2TexTestSupport` | Helpers: `resetStatics()`, `tokenize()`, `analyze()`, `latexWithoutAlignment()`, `runCli()` |
-| `TokenizeSpecTest` | Token shapes the overhaul depends on (keywords vs identifiers, `WF_` split, primes, parens) |
+| `TLA2TexTestSupport` | Helpers: `resetStatics()`, `tokenize()`, `analyze()`, `latexWithoutAlignment()`, `runCli()`, `runCliWithJvmArgs()` |
+| `TokenizeSpecTest` | Token shapes the overhaul depends on (keywords vs identifiers, `WF_` split and `foo.WF_foo`, primes, parens) |
 | `CommentFormattingTest` | English prose vs TLA tokens in comments; isolation between specs |
+| `DirectivesTest` | The `@tlatex:` notation: parsing, warnings with line numbers, removal of directive lines, `-directives` file |
+| `SymbolSubstitutionTest` | `symbol`/`preset` directives in the spec and in comments |
+| `MacroSpansTest` | `macro` directives: SANY-located arguments, nesting, definitions, and every reason an application is typeset as usual |
+| `CommandLineTest` | `-help`/`-info` return, output extension from `-latexCommand`, argument lists for external programs |
 | `GoldenLaTeXTest` | For each `test-model/tla2tex/NAME.tla`, the LaTeX body must equal `NAME.golden.tex` |
-| `TypesetWithLaTeXTest` | Runs the real CLI with `pdflatex` on every test spec; skipped if `pdflatex` is absent |
+| `TypesetWithLaTeXTest` | Runs the real CLI with `pdflatex`: every test spec, spacing after macros, LaTeX-error exit code, UTF-8, spaces in names; skipped if `pdflatex` is absent |
 
 ### Writing a test
 
 TLATeX keeps all state in static fields and normally runs once per JVM, so:
 
 - Call `TLA2TexTestSupport.resetStatics()` in `@Before`. It restores every
-  `Parameters` option to its default and resets the tokenizer tables and the
-  comment tokenizer's quote state (`TokenizeSpec.reset()`,
-  `TokenizeComment.reset()`), which otherwise leak from one spec to the next.
+  `Parameters` option to its default and resets the tokenizer tables, the
+  comment tokenizer's quote state and the active directive table
+  (`TokenizeSpec.reset()`, `TokenizeComment.reset()`, `Directives.reset()`),
+  which otherwise leak from one spec to the next.
 - Use `latexWithoutAlignment(specText, dir)` for output tests. It runs the
   whole pipeline except the two LaTeX runs, so every alignment space is zero
   and no TeX installation is needed. `documentBody()` strips the inlined
@@ -166,8 +171,9 @@ minutes; `bash scripts/tlatex-dev.sh regress 20` runs only the first 20 specs.
 Ready-made specs for the operator-to-TeX-macro work live in
 [tests/fixtures/tlatex/](../tests/fixtures/tlatex/): Greek-letter substitution,
 operator-application argument capture, nested/multi-line argument boundaries,
-and the full range of operator fixities. All parse cleanly with SANY. Typeset
-one with:
+and the full range of operator fixities, plus copies of the first three that
+use the phase 1 `@tlatex:` directives (`*Preset.tla`, `*Directives.tla`). All
+parse cleanly with SANY. Typeset one with:
 
 ```sh
 bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
@@ -217,7 +223,7 @@ Bypass a single commit with `git commit --no-verify`.
 PR and push that touches the submodule pointer, the dev script, the fixtures,
 or the regression list. It checks out the submodule, builds the jar with JDK
 17, runs the `test/tla2tex/*` JUnit tests, typesets every fixture (failing on
-any LaTeX error in the `.log`, which `tla2tex` itself ignores), runs the
+a non-zero `tla2tex` exit or any LaTeX error in the `.log`), runs the
 release-vs-built regression, and uploads the jar and the typeset output as
 artifacts. Because the checkout uses `submodules: true`,
 a pointer to an unpushed fork commit fails the job. Run `npm run tlatex:check`

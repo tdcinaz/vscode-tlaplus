@@ -1,6 +1,9 @@
 # TLATeX overhaul — Phase 1 proposal (source changes)
 
-*Status: proposal, 2026-10-01; P1-4 revised 2026-10-08 to locate macro
+*Status: implemented 2026-10-22 on fork branch `tlatex-overhaul` (commits
+`c8fcc8e` P1-1 through `5e11661` P1-5), with the §8 decisions taken as
+proposed; see [§9](#9-as-built-notes) for what differs from the plan.
+Proposal of 2026-10-01; P1-4 revised 2026-10-08 to locate macro
 arguments with SANY's parse tree instead of parenthesis counting. Analysis of
 `tlaplus/tlatools/org.lamport.tlatools/src/tla2tex/` at fork commit `fbceae3`,
 which adds tests and two reset hooks but changes no typesetting behaviour.
@@ -379,3 +382,54 @@ leave `npm run tlatex:check` green.
 6. **When SANY cannot parse the spec**: drop macros with a warning and
    typeset anyway (proposed), or fail the run so the author notices. Falling
    back keeps TLATeX's "does not check syntax" contract.
+
+## 9. As-built notes
+
+Phase 1 landed as five fork commits, one per work item, each leaving
+`npm run tlatex:check` green; the release-vs-built regression is identical
+for all 210 specs after every item. User documentation is in `help.txt` and
+the last section of `info.txt` (`tla2tex.TLA -info`). The §8 decisions were
+all taken as proposed.
+
+Departures from and additions to the plan:
+
+- **Directive placement rules (P1-2).** A line that holds only a directive
+  is dropped, so it leaves no blank line. A directive comment sharing a line
+  with code is dropped from that line. The one exception is the first or last
+  line of a multi-line `(* ... *)` comment that also has code on it: its text
+  is blanked, keeping the comment well formed. Box-comment decoration (`*`) is
+  stripped before matching. Explicit `symbol` directives override
+  `preset greek` whatever their order. A redefinition with different TeX warns,
+  and the last definition wins.
+- **Template arguments are braced (P1-4).** `#k` expands to `{arg}`, so a
+  template behaves like a TeX macro of k arguments (`\sqrt #1` works for
+  compound arguments); `##` is a literal `#`. Symbols are braced the same way.
+- **Qualified heads (P1-4).** `M!Op(...)` matches on `Op`, and the macro
+  replaces the whole application, `M!` included.
+- **Tokenizer column bug (P1-4).** The proposal assumed SANY's `col-1` always
+  equals `Token.column`. It does not after a built-in the tokenizer had to
+  shorten: `(-5`, `(\E x ...`, `(\A ...` begin like `(-)`/`(\X)`, and the
+  BUILT_IN state backs up the reader without resetting `ncol`. The next
+  token's column then comes out one or more places too far right. Fixing
+  the tokenizer would move alignments in existing specs, so `MacroSpans`
+  checks each token against the tab-expanded source line and corrects its
+  column for its own use. The bug is recorded as README bug 5 for phase 2.
+- **Spacing after a macro (P1-4).** `SetDimensions` turns extra source
+  spaces before a token into typeset space. After a macro those spaces were
+  padding for the source text (`Sum(term, lo, hi)   ==`), so the new
+  `LaTeXOutput.SourceGap` counts them as one space when the token to the
+  left is the hidden `)` of a macro. Without this, an aligned `==` after a
+  macro that typesets wider than its neighbours lost its alignment. It only
+  affects lines with macros.
+- **LaTeX errors (P1-5).** Both LaTeX runs still happen and all output is
+  written; a failed final run then raises the error (non-zero exit), and a
+  failed alignment-only run is a warning. The output extension follows
+  `-latexCommand` (pdf for pdflatex/lualatex/xelatex) unless
+  `-latexOutputExt` is given. A failing `-psCommand` is a warning, as
+  before only more visible.
+- **Not done in phase 1.** Directives in `tla2tex.TeX` (tlatex
+  environments in LaTeX documents) are ignored. The `tlaplus.pdf.directivesFile`
+  extension setting is not added yet. The `.sty` is unchanged, so templates
+  must use commands base LaTeX and `tlatex.sty` define (`\|`, `\vert`, not
+  amsmath's `\lVert`) or come from a `-style` package.
+

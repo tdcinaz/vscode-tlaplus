@@ -16,6 +16,22 @@ Each spec targets a specific facet of operator parsing:
                        user operators, to map the full space the parser must
                        recognize.
 
+The following specs use the phase 1 "@tlatex:" directives (documented in the
+INFO text, `java -cp tla2tools.jar tla2tex.TLA -info`, last section):
+
+  GreekOperatorsPreset.tla       GreekOperators.tla plus `preset greek': every
+                                 Greek letter name prints as its symbol, also in
+                                 comments where TLATeX classifies it as TLA.
+  MacroOperatorsDirectives.tla   MacroOperators.tla plus `macro' directives: each
+                                 single-line application and definition prints
+                                 with its TeX template.
+  NestedArgumentsDirectives.tla  NestedArguments.tla plus the same directives:
+                                 nested applications nest; the multi-line N3 is
+                                 typeset as without directives.
+
+Copies of these three live in test-model/tla2tex/ of the tlaplus fork, where
+GoldenLaTeXTest compares their output with reviewed golden files.
+
 Typeset any of them with the freshly built jar:
 
   bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
