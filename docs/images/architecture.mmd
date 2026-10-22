@@ -1,0 +1,46 @@
+flowchart TB
+    user([User / Agent])
+
+    subgraph EXT["VS Code extension (src/)"]
+        host["Extension host<br/>commands, language features"]
+        ui["Panels and webviews"]
+        ai["Copilot tools, MCP server,<br/>debug adapter"]
+        runner["tla2tools.ts<br/>tool runner"]
+        host --> runner
+        ui --- host
+        ai --> runner
+    end
+
+    subgraph JAR["tla2tools.jar (Java 17)"]
+        tlc["TLC / SANY / PlusCal"]
+        subgraph TEX["TLATeX (tla2tex), the overhaul target"]
+            tok["Tokenize"] --> align["Align"] --> emit["LaTeXOutput"]
+        end
+    end
+
+    pdf[/"pdflatex, then .tex / .pdf"/]
+
+    subgraph SUB["tlaplus/ submodule (fork, branch tlatex-overhaul)"]
+        jsrc["tla2tex Java source"]
+        jtest["JUnit tests + golden files"]
+        ant["Ant build"]
+        jsrc --> ant
+        jtest --> ant
+    end
+
+    subgraph DEV["Dev harness and CI"]
+        script["tlatex-dev.sh<br/>(npm run tlatex:*)"]
+        fix["Fixtures + regress list"]
+        ci["GitHub Actions"]
+        ci --> script
+        script --> fix
+    end
+
+    user --> EXT
+    user --> script
+    runner -- "spawns java" --> JAR
+    emit --> pdf
+    ant -- "builds" --> JAR
+    script -- "build, test, golden" --> SUB
+    script -- "swap jar (tlatex:dev)" --> JAR
+    fix -. "typeset, regress" .-> TEX
