@@ -11,6 +11,7 @@
 #   docs/
 #   scripts/
 #   deliverables/
+#   SanDiskLaTeX/
 #
 # Sparse checkout limits the second repo to those folders: files it has outside
 # them (e.g. its own README.md) are never written into the workspace, and an
@@ -37,6 +38,7 @@ TRACKED_DIRS=(
     "docs"
     "scripts"
     "deliverables"
+    "SanDiskLaTeX"
 )
 
 GIT_DIR_RECON="$(git -C "${REPO_ROOT}" rev-parse --path-format=absolute --git-common-dir)/recon.git"

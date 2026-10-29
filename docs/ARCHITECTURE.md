@@ -26,4 +26,4 @@ npx -p @mermaid-js/mermaid-cli mmdc -i docs/images/architecture.mmd -o docs/imag
 | Fixtures | Sample specs for new syntax; regression list | `tests/fixtures/tlatex/`, `tests/tlatex-regress.txt` |
 | Guards | Block jar, Eclipse metadata, and unpushed submodule pointer commits | `.githooks/` |
 | CI | Extension CI, TLATeX Java CI, release | `.github/workflows/` |
-| Recon repo | Second git dir tracking `tla2tex/`, fixtures, docs, scripts, deliverables | `scripts/recon.sh` |
+| Recon repo | Second git dir tracking `tla2tex/`, fixtures, docs, scripts, deliverables, SanDiskLaTeX | `scripts/recon.sh` |
