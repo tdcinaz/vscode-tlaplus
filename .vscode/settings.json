@@ -25,5 +25,6 @@
         "**/tlaplus/general/**",
         "**/tlaplus/toolbox/**",
         "**/tlaplus/tlatools/org.lamport.tlatools.*/**"
-    ]
+    ],
+    "tlaplus.tlc.modelChecker.options": "-workers 1 -coverage 1"
 }
