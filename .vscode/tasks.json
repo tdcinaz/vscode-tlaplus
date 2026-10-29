@@ -58,6 +58,92 @@
             "command": "bash scripts/tlatex-dev.sh status",
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        // ReconTEXTualization shares this work tree through .git/recon.git, so
+        // the Source Control panel cannot show it; these wrap scripts/recon.sh.
+        {
+            "label": "recon: status",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "status", "--short", "--branch"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+        },
+        {
+            "label": "recon: diff (working tree and staged vs HEAD)",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "diff", "HEAD"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+        },
+        {
+            "label": "recon: stage all changes",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "add", "-A"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "recon: commit staged",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "commit", "-m", "${input:reconCommitMessage}"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "recon: stage all and commit",
+            "dependsOrder": "sequence",
+            "dependsOn": ["recon: stage all changes", "recon: commit staged"],
+            "problemMatcher": []
+        },
+        {
+            "label": "recon: push",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "push"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "recon: pull",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "pull", "--no-edit"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "recon: log",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "log", "--oneline", "--decorate", "-20"],
+            "options": { "env": { "GIT_PAGER": "cat" } },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+        },
+        {
+            "label": "recon: init (once per clone)",
+            "type": "process",
+            "command": "bash",
+            "args": ["scripts/recon.sh", "init"],
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "reconCommitMessage",
+            "type": "promptString",
+            "description": "ReconTEXTualization commit message"
         }
     ]
 }

@@ -375,6 +375,13 @@ sparse-checkout` (except `list`) are blocked, because everything outside the
 tracked folders counts as ignored in the second repo. To change the tracked
 folders, edit `TRACKED_DIRS` in the script and re-run `init`.
 
+VS Code's Source Control panel cannot show ReconTEXTualization: VS Code
+identifies a repository by its work-tree folder and runs git there, where it
+finds this repo's `.git`. Use **Terminal → Run Task** instead; the `recon:`
+tasks in [.vscode/tasks.json](../.vscode/tasks.json) cover status, diff, stage
+all, commit (prompts for the message), stage all and commit, push, pull, log,
+and init.
+
 ## Working with agents
 
 - [CLAUDE.md](../CLAUDE.md) is the agent-facing summary: layout, commands, and
