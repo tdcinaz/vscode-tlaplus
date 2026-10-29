@@ -13,6 +13,9 @@ tests/fixtures/tlatex/*.dvi
 tests/fixtures/tlatex/*.pdf
 tests/fixtures/tlatex/*.log
 tests/fixtures/tlatex/*.aux
+tests/fixtures/tlatex/*.fdb_latexmk
+tests/fixtures/tlatex/*.fls
+tests/fixtures/tlatex/*.synctex.gz
 tests/fixtures/tlatex/tlatex.*
 tests/fixtures/tlatex/*.png
 

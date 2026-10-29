@@ -60,6 +60,10 @@ exclude_patterns() {
             echo "!${prefix}/"
         done
     done
+    # LaTeX build artifacts are never tracked; these come last so they win.
+    echo '*.fdb_latexmk'
+    echo '*.fls'
+    echo '*.synctex.gz'
 }
 
 cmd_init() {
