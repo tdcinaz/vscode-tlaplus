@@ -160,9 +160,12 @@ files, and commit them with the Java change.
 
 `npm run tlatex:regress` typesets every spec listed in
 [tests/tlatex-regress.txt](../tests/tlatex-regress.txt) (210 upstream
-`test-model` specs) twice, with the committed release `tools/tla2tools.jar`
-and with the freshly built jar, and requires the generated `.tex` to be
-byte-identical. The overhaul's features are opt-in, so a spec that uses none
+`test-model` specs, then the 26 real-world modules under
+[tests/fixtures/tlatex/examples/](../tests/fixtures/tlatex/examples/)) twice,
+with the committed release `tools/tla2tools.jar` and with the freshly built
+jar, and requires the generated `.tex` to be byte-identical. A bare name in
+the list is a `test-model` file; a name with a slash is a path from the
+repository root. The overhaul's features are opt-in, so a spec that uses none
 of them must typeset exactly as before. It needs `pdflatex` and takes a few
 minutes; `bash scripts/tlatex-dev.sh regress 20` runs only the first 20 specs.
 
@@ -178,6 +181,14 @@ parse cleanly with SANY. Typeset one with:
 ```sh
 bash scripts/tlatex-dev.sh typeset tests/fixtures/tlatex/MacroOperators.tla
 ```
+
+Real-world specs from [tlaplus/examples](https://github.com/tlaplus/examples)
+live in [tests/fixtures/tlatex/examples/](../tests/fixtures/tlatex/examples/):
+Paxos, Paxos Commit, Bakery and BinarySearch with their TLAPS proofs, PlusCal
+in both syntaxes, Lamport's TLA+ grammar, the book's write-through cache, and
+specs that use `delta` or `Sigma` as identifiers. Its `README.txt` records the
+upstream commit and what each spec exercises. `tlatex:check` typesets them
+all, and they are in the regression list.
 
 ## Inspecting typeset output
 

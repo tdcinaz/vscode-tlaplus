@@ -38,3 +38,8 @@ Typeset any of them with the freshly built jar:
 
 They are syntactically valid TLA+, so they can also be parsed with SANY and
 reused as inputs for future JUnit tests under test/tla2tex/ in the tlaplus fork.
+
+examples/ holds real-world specs copied from https://github.com/tlaplus/examples
+(Paxos, Paxos Commit, Bakery, PlusCal algorithms, TLAPS proofs, the TLA+
+grammar, Greek-letter identifiers). They are typeset by `tlatex:check' and
+listed in tests/tlatex-regress.txt; see examples/README.txt.

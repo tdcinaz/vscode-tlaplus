@@ -274,24 +274,28 @@ cmd_regress() {
         specs=( "${specs[@]:0:${limit}}" )
     fi
     log "Regression: ${#specs[@]} spec(s), committed release jar vs ${BUILT_JAR#${REPO_ROOT}/}"
-    local failed=0 name root
+    local failed=0 name root src file stem
     for name in "${specs[@]}"; do
+        # A bare name is a test-model spec; a name with a slash is relative to the repo root.
+        if [[ "${name}" == */* ]]; then src="${REPO_ROOT}/${name}"; else src="${model}/${name}"; fi
         root="${name%.tla}"
-        if [[ ! -f "${model}/${name}" ]]; then
-            warn "  missing: ${model}/${name}"; failed=$((failed + 1)); continue
+        file="$(basename "${name}")"
+        stem="${file%.tla}"
+        if [[ ! -f "${src}" ]]; then
+            warn "  missing: ${src}"; failed=$((failed + 1)); continue
         fi
         mkdir -p "${work}/base/${root}" "${work}/new/${root}"
-        cp "${model}/${name}" "${work}/base/${root}/"
-        cp "${model}/${name}" "${work}/new/${root}/"
-        if ! typeset_one "${baseline}" "${work}/base/${root}" "${name}" > "${work}/base/${root}/tla2tex.out" 2>&1; then
+        cp "${src}" "${work}/base/${root}/"
+        cp "${src}" "${work}/new/${root}/"
+        if ! typeset_one "${baseline}" "${work}/base/${root}" "${file}" > "${work}/base/${root}/tla2tex.out" 2>&1; then
             warn "  release jar failed on ${name} (see ${work}/base/${root}/tla2tex.out)"; failed=$((failed + 1)); continue
         fi
-        if ! typeset_one "${BUILT_JAR}" "${work}/new/${root}" "${name}" > "${work}/new/${root}/tla2tex.out" 2>&1; then
+        if ! typeset_one "${BUILT_JAR}" "${work}/new/${root}" "${file}" > "${work}/new/${root}/tla2tex.out" 2>&1; then
             warn "  built jar failed on ${name} (see ${work}/new/${root}/tla2tex.out)"; failed=$((failed + 1)); continue
         fi
-        if ! cmp -s "${work}/base/${root}/${root}.tex" "${work}/new/${root}/${root}.tex"; then
+        if ! cmp -s "${work}/base/${root}/${stem}.tex" "${work}/new/${root}/${stem}.tex"; then
             warn "  DIFF: ${name}"
-            diff -u "${work}/base/${root}/${root}.tex" "${work}/new/${root}/${root}.tex" | head -40 >&2 || true
+            diff -u "${work}/base/${root}/${stem}.tex" "${work}/new/${root}/${stem}.tex" | head -40 >&2 || true
             failed=$((failed + 1))
         fi
     done
@@ -311,6 +315,9 @@ cmd_check() {
     cmd_test
     local fixtures=( "${REPO_ROOT}"/tests/fixtures/tlatex/*.tla )
     [[ -f "${fixtures[0]}" ]] || die "No fixtures found under tests/fixtures/tlatex/"
+    local -a examples
+    mapfile -t examples < <(find "${REPO_ROOT}/tests/fixtures/tlatex/examples" -name '*.tla' 2>/dev/null | sort)
+    fixtures+=( "${examples[@]}" )
     TARGET_JAR="${BUILT_JAR}" cmd_typeset "${fixtures[@]}"
     if [[ -n "${TLATEX_SKIP_REGRESS:-}" ]]; then
         warn "TLATEX_SKIP_REGRESS set; skipping the release-vs-built regression."

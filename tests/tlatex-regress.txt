@@ -1,14 +1,17 @@
 # Specs used by `scripts/tlatex-dev.sh regress` (npm run tlatex:regress).
 #
-# Each name is a file in tlaplus/tlatools/org.lamport.tlatools/test-model/.
+# A bare name is a file in tlaplus/tlatools/org.lamport.tlatools/test-model/;
+# a name containing a slash is a path relative to the repository root.
 # They are typeset with the committed release jar and with the freshly built
 # jar, and the generated .tex files must be byte-identical. Phase 1 features
 # are opt-in, so a spec that uses none of them must typeset exactly as before.
 #
 # The list is every top-level test-model spec that typesets with zero LaTeX
 # errors using the release jar (210 of 211 as of the 2026-10-01 sweep;
-# UseHideModuleDefsXml.tla has no ==== line, so tla2tex rejects it). Lines starting with # are
-# ignored. `regress N` runs only the first N entries.
+# UseHideModuleDefsXml.tla has no ==== line, so tla2tex rejects it), followed
+# by the real-world specs from tlaplus/examples under tests/fixtures/tlatex/examples/
+# (see its README.txt). Lines starting with # are ignored. `regress N` runs
+# only the first N entries.
 ActionLevelProp.tla
 Alias.tla
 AssertExpressionStack.tla
@@ -219,3 +222,30 @@ ValueSemanticsTheorems.tla
 ViewMap.tla
 dekker.tla
 testinvalidinvariant.tla
+# Real-world specs from https://github.com/tlaplus/examples.
+tests/fixtures/tlatex/examples/Bakery-Boulangerie/Bakery.tla
+tests/fixtures/tlatex/examples/LoopInvariance/BinarySearch.tla
+tests/fixtures/tlatex/examples/N-Queens/QueensPluscal.tla
+tests/fixtures/tlatex/examples/Paxos/Consensus.tla
+tests/fixtures/tlatex/examples/Paxos/Paxos.tla
+tests/fixtures/tlatex/examples/Paxos/Voting.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/CachingMemory/InternalMemory.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/CachingMemory/Memory.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/CachingMemory/MemoryInterface.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/CachingMemory/WriteThroughCache.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/Syntax/BNFGrammars.tla
+tests/fixtures/tlatex/examples/SpecifyingSystems/Syntax/TLAPlusGrammar.tla
+tests/fixtures/tlatex/examples/chang_roberts/ChangRoberts.tla
+tests/fixtures/tlatex/examples/detector_chan96/EPFailureDetector.tla
+tests/fixtures/tlatex/examples/ewd998/AsyncTerminationDetection.tla
+tests/fixtures/tlatex/examples/ewd998/EWD998.tla
+tests/fixtures/tlatex/examples/ewd998/EWD998Chan.tla
+tests/fixtures/tlatex/examples/ewd998/EWD998ChanID.tla
+tests/fixtures/tlatex/examples/ewd998/Utils.tla
+tests/fixtures/tlatex/examples/locks_auxiliary_vars/Stuttering.tla
+tests/fixtures/tlatex/examples/tlaps-library/FiniteSetTheorems.tla
+tests/fixtures/tlatex/examples/tlaps-library/NaturalsInduction.tla
+tests/fixtures/tlatex/examples/tlaps-library/TLAPS.tla
+tests/fixtures/tlatex/examples/tlaps-library/WellFoundedInduction.tla
+tests/fixtures/tlatex/examples/transaction_commit/PaxosCommit.tla
+tests/fixtures/tlatex/examples/transaction_commit/TCommit.tla

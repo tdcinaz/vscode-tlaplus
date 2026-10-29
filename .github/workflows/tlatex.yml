@@ -63,7 +63,7 @@ jobs:
       with:
         name: tlatex-fixture-output
         path: |
-          tests/fixtures/tlatex/*.pdf
-          tests/fixtures/tlatex/*.tex
-          tests/fixtures/tlatex/*.log
+          tests/fixtures/tlatex/**/*.pdf
+          tests/fixtures/tlatex/**/*.tex
+          tests/fixtures/tlatex/**/*.log
         if-no-files-found: ignore
