@@ -28,8 +28,10 @@ INFO text, `java -cp tla2tools.jar tla2tex.TLA -info`, last section):
   NestedArgumentsDirectives.tla  NestedArguments.tla plus the same directives:
                                  nested applications nest; the multi-line N3 is
                                  typeset as without directives.
+  CardinalityBars.tla            `macro Cardinality/1' prints the cardinality
+                                 of a finite set as |S| with vertical bars.
 
-Copies of these three live in test-model/tla2tex/ of the tlaplus fork, where
+Copies of the first three live in test-model/tla2tex/ of the tlaplus fork, where
 GoldenLaTeXTest compares their output with reviewed golden files.
 
 Typeset any of them with the freshly built jar:
