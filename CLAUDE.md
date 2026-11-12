@@ -94,4 +94,7 @@ TeX macros (and identifier-to-symbol substitution such as `alpha` to `\alpha`).
 Phase 1 implements it for single-line applications through `@tlatex:`
 directives (`Directives`, `MacroSpans`, `TokenRenderer`); user docs are in the
 last section of `src/tla2tex/info.txt`, and what differs from the plan is in
-§9 of the phase 1 proposal.
+§9 of the phase 1 proposal. The `brace conjunctions` directive
+(`ConjunctionBraces`, TeX in `src/tla2tex/tlatexbraces.sty`, which is inlined only
+when the directive is used) typesets a definition whose body is a conjunction
+list like a piecewise function.

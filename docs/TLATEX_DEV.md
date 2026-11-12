@@ -126,9 +126,10 @@ Ant target, one JVM per test class, like the upstream `tlc2`/`tla2sany` suites.
 | `DirectivesTest` | The `@tlatex:` notation: parsing, warnings with line numbers, removal of directive lines, `-directives` file |
 | `SymbolSubstitutionTest` | `symbol`/`preset` directives in the spec and in comments |
 | `MacroSpansTest` | `macro` directives: SANY-located arguments, nesting, definitions, and every reason an application is typeset as usual |
+| `ConjunctionBracesTest` | `brace conjunctions` directive: the `\@bx` box with invisible bullets, both list styles, nesting, and every reason a list is typeset as usual |
 | `CommandLineTest` | `-help`/`-info` return, output extension from `-latexCommand`, argument lists for external programs |
 | `GoldenLaTeXTest` | For each `test-model/tla2tex/NAME.tla`, the LaTeX body must equal `NAME.golden.tex` |
-| `TypesetWithLaTeXTest` | Runs the real CLI with `pdflatex`: every test spec, spacing after macros, LaTeX-error exit code, UTF-8, spaces in names; skipped if `pdflatex` is absent |
+| `TypesetWithLaTeXTest` | Runs the real CLI with `pdflatex`: every test spec, spacing after macros, a braced list too wide to sit beside its name, LaTeX-error exit code, UTF-8, spaces in names; skipped if `pdflatex` is absent |
 
 ### Writing a test
 
