@@ -31,6 +31,16 @@ INFO text, `java -cp tla2tools.jar tla2tex.TLA -info`, last section):
   CardinalityBars.tla            `macro Cardinality/1' prints the cardinality
                                  of a finite set as |S| with vertical bars.
 
+  Showcase.tla                   The "before" half of the TLATeX poster example
+                                 (EXTENDS Reals, Calculus; Calculus.tla here
+                                 defines the operators): calls and Greek names
+                                 print literally.
+  ShowcaseDirectives.tla         The "after" half: Showcase.tla plus the poster's
+                                 seven directives (preset greek and macros
+                                 Integral, Sum, Frac, Sqrt, Norm, Abs). Named
+                                 ShowcaseDirectives since the module name must
+                                 match the file name.
+
 Copies of the first three live in test-model/tla2tex/ of the tlaplus fork, where
 GoldenLaTeXTest compares their output with reviewed golden files.
 
